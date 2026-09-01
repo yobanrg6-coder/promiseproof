@@ -7,7 +7,12 @@ google-adk==2.7.0
 # LiteLLM is ADK's bridge to non-Google models - it's what actually speaks to
 # Nebius Token Factory's OpenAI-compatible endpoint (see agents/promise_extractor.py,
 # agents/promise_auditor.py). Required for `from google.adk.models.lite_llm import LiteLlm`.
+# NOTE: litellm pulls a large unpinned dependency tree (tiktoken, tokenizers,
+# jiter, jsonschema, ...). openai is pinned below because a major bump is the
+# most likely thing to break litellm mid-judging-window; for a hard freeze run
+# `pip freeze > requirements.lock` in the deploy environment.
 litellm==1.99.0
+openai==2.54.0
 fastmcp==3.4.7
 fastapi==0.141.1
 uvicorn==0.52.3

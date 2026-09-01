@@ -32,6 +32,7 @@ logger = logging.getLogger("promiseproof")
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(PROJECT_ROOT)
 
+from agents.promise_extractor import DEFAULT_MODEL
 from agents.promise_orchestrator import PromiseLedgerOrchestrator
 from ledger import promises as ledger
 
@@ -151,7 +152,7 @@ async def health_check():
     return {
         "status": "online",
         "service": "PromiseProof",
-        "model": os.getenv("MODEL", "nvidia/Llama-3_3-Nemotron-Super-49B-v1"),
+        "model": os.getenv("MODEL", DEFAULT_MODEL),
         "backend": os.getenv("LEDGER_BACKEND", "json"),
     }
 

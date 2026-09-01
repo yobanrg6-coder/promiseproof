@@ -209,6 +209,12 @@ Submission Period."** What changed:
 - **New, isolated GCP project** (`GCP_PROJECT`, no longer hardcoded) — this
   fork never touches the original project, which keeps running unmodified for
   its own, already-judged hackathon.
+- **Reasoning-model hardening**: both system prompts request `detailed
+  thinking off`; `LiteLlm(..., drop_params=True)` lets LiteLLM drop any
+  request field Nebius won't accept for a given model instead of erroring;
+  and the orchestrator's output parser strips `<think>…</think>` traces and
+  code fences and, as a last resort, slices the outer JSON object before
+  validating — so a Nemotron reasoning trace can't break the pipeline.
 - Full rebrand (package identifiers, service names, docs, submission
   materials) and a fresh git history, per the hackathon's project-page rules.
 

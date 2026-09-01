@@ -36,12 +36,19 @@ When you reject, tighter_instruction must be a single concrete order the extract
 "The source quote is an intention, not a dated commitment - reject this statement as non-falsifiable."
 
 When you accept, issues may still list minor concerns, but agrees_falsifiable=true.
-Output strictly conforms to the schema."""
+Output strictly conforms to the schema.
+
+detailed thinking off
+Respond with ONLY the JSON object. Do not emit any reasoning, preamble, <think> block, or code fence."""
 
 
 def create_promise_auditor_agent(model_name: str | None = None, api_key: str | None = None) -> LlmAgent:
-    model = model_name or os.getenv("AUDITOR_MODEL", DEFAULT_AUDITOR_MODEL)
-    lite_llm_kwargs: dict = {}
+    # Accept a bare NVIDIA model id or one already carrying LiteLLM's "nebius/"
+    # provider prefix - normalize so we never double-prefix.
+    model = (model_name or os.getenv("AUDITOR_MODEL", DEFAULT_AUDITOR_MODEL)).removeprefix("nebius/")
+    # drop_params: let LiteLLM drop request fields Nebius rejects for this
+    # model rather than erroring (see promise_extractor.py for the rationale).
+    lite_llm_kwargs: dict = {"drop_params": True}
     if api_key:
         lite_llm_kwargs["api_key"] = api_key
     if api_base := os.getenv("NEBIUS_API_BASE"):

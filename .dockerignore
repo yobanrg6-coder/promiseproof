@@ -10,6 +10,10 @@ __pycache__/
 tests/
 requirements-dev.txt
 BITACORA_PROYECTO.md
-submission/
+HANDOFF_28ago.md
+PITCH_VIDEO_SCRIPT.md
+SUBMISSION_DEVPOST.md
+docs/
 *.md
 .pytest_cache/
+.ruff_cache/

@@ -8,7 +8,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from agents.promise_orchestrator import AgentExecutionError, PromiseLedgerOrchestrator
+from agents.promise_orchestrator import (
+    AgentExecutionError,
+    PromiseLedgerOrchestrator,
+    _strip_model_scaffolding,
+)
 from agents.promise_schemas import PromiseAudit, PromiseExtraction
 from ledger.promises import InMemoryBackend
 
@@ -192,3 +196,37 @@ async def test_audit_or_skip_catches_timeout_and_returns_none():
         with patch("agents.promise_orchestrator.AUDITOR_TIMEOUT_SECONDS", 0.05):
             res = await orch._audit_or_skip(_valid_extraction())
             assert res is None
+
+
+# =========================================================================== #
+# 5. _strip_model_scaffolding - reasoning-model output cleanup
+# =========================================================================== #
+_PAYLOAD = '{"agrees_falsifiable": true, "issues": [], "tighter_instruction": ""}'
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        _PAYLOAD,
+        f"```json\n{_PAYLOAD}\n```",
+        f"<think>\nThe deadline is concrete and the keywords are specific, so this passes.\n</think>\n{_PAYLOAD}",
+        f"<think>reasoning...</think>\n\n```json\n{_PAYLOAD}\n```",
+        f"Here is the audit result:\n{_PAYLOAD}\nLet me know if you need more.",
+        f"<THINK>upper-case tag</THINK>{_PAYLOAD}",
+    ],
+)
+def test_strip_model_scaffolding_recovers_json(raw):
+    cleaned = _strip_model_scaffolding(raw)
+    parsed = PromiseAudit.model_validate_json(cleaned)
+    assert parsed.agrees_falsifiable is True
+
+
+def test_strip_model_scaffolding_handles_unclosed_think():
+    # A truncated trace that never closed its <think> tag, then the JSON.
+    raw = f"<think>I am still reasoning and never stopped</think> some words {_PAYLOAD}"
+    cleaned = _strip_model_scaffolding(raw)
+    assert PromiseAudit.model_validate_json(cleaned).agrees_falsifiable is True
+
+
+def test_strip_model_scaffolding_leaves_plain_json_untouched():
+    assert _strip_model_scaffolding(_PAYLOAD) == _PAYLOAD

@@ -35,7 +35,7 @@ from google.genai import types
 
 from agents.falsifiability_gate import run_gate
 from agents.promise_auditor import create_promise_auditor_agent
-from agents.promise_extractor import create_promise_extractor_agent
+from agents.promise_extractor import DEFAULT_MODEL, create_promise_extractor_agent
 from agents.promise_schemas import PromiseAudit, PromiseExtraction
 from ledger import promises as ledger
 
@@ -54,10 +54,34 @@ class AgentExecutionError(RuntimeError):
     pass
 
 
+_THINK_BLOCK = re.compile(r"<think\b[^>]*>.*?</think>", re.DOTALL | re.IGNORECASE)
+_FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.IGNORECASE)
+
+
+def _strip_model_scaffolding(text: str) -> str:
+    """Best-effort removal of reasoning-model scaffolding around a JSON payload.
+
+    Handles, in order: complete ``<think>...</think>`` blocks; a leftover
+    unclosed ``<think>`` (or trailing ``</think>``) from a truncated trace; a
+    ```json ... ``` fence; finally, if what's left still isn't bare JSON, the
+    slice from the first ``{`` / ``[`` to its matching last ``}`` / ``]``.
+    """
+    text = _THINK_BLOCK.sub("", text).strip()
+    if "</think>" in text:  # unclosed opener consumed the block above
+        text = text.rsplit("</think>", 1)[-1].strip()
+    text = _FENCE.sub("", text.strip()).strip()
+    if text[:1] not in ("{", "["):
+        start = min((i for i in (text.find("{"), text.find("[")) if i != -1), default=-1)
+        end = max(text.rfind("}"), text.rfind("]"))
+        if start != -1 and end > start:
+            text = text[start : end + 1]
+    return text
+
+
 class PromiseLedgerOrchestrator:
     def __init__(self, api_key: str | None = None, model: str | None = None):
         self.api_key = api_key or os.getenv("NEBIUS_API_KEY")
-        self.model_name = model or os.getenv("MODEL", "nvidia/Llama-3_3-Nemotron-Super-49B-v1")
+        self.model_name = model or os.getenv("MODEL", DEFAULT_MODEL)
         if not self.api_key:
             raise AgentExecutionError("NEBIUS_API_KEY is not set")
 
@@ -93,14 +117,18 @@ class PromiseLedgerOrchestrator:
                 return output_model.model_validate(final_event.output)
             except ValidationError:
                 pass
-        text = None
+        # Join every non-"thought" text part (a reasoning model can emit its
+        # trace as a separate part; ADK tags those thought=True). Taking only
+        # parts[-1] would miss a split answer or grab a trailing reasoning part.
+        text = ""
         if final_event.content and final_event.content.parts:
-            text = final_event.content.parts[-1].text
-        if not text:
+            text = "".join(
+                p.text for p in final_event.content.parts
+                if p.text and not getattr(p, "thought", False)
+            )
+        if not text.strip():
             raise AgentExecutionError(f"{label}: no parsable output")
-        # Models often wrap structured output in a ```json ... ``` fence;
-        # strip it before parsing so the fallback path doesn't fail on it.
-        text = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", text.strip())
+        text = _strip_model_scaffolding(text)
         try:
             return output_model.model_validate_json(text)
         except ValidationError as exc:

@@ -52,16 +52,25 @@ When it qualifies, fill every field:
 
 If a single announcement contains several promises, extract the ONE with the clearest, nearest,
 most checkable deadline. Output strictly conforms to the schema.
+
+detailed thinking off
+Respond with ONLY the JSON object. Do not emit any reasoning, preamble, <think> block, or code fence.
 """
 
 
 def create_promise_extractor_agent(model_name: str | None = None, api_key: str | None = None) -> LlmAgent:
-    model = model_name or os.getenv("MODEL", DEFAULT_MODEL)
+    # Accept a bare NVIDIA model id ("nvidia/Llama-...") OR one that already
+    # carries LiteLLM's "nebius/" provider prefix - normalize so we never
+    # double-prefix into "nebius/nebius/...".
+    model = (model_name or os.getenv("MODEL", DEFAULT_MODEL)).removeprefix("nebius/")
     # LiteLLM's "nebius/" provider prefix routes to Nebius Token Factory's
     # OpenAI-compatible endpoint; api_key/api_base are forwarded straight
     # through to litellm.completion(). NEBIUS_API_KEY in the environment is
-    # picked up automatically if api_key is omitted.
-    lite_llm_kwargs: dict = {}
+    # picked up automatically if api_key is omitted. drop_params lets LiteLLM
+    # silently drop any request field Nebius doesn't accept for this model
+    # (e.g. an unsupported response_format flavor) instead of erroring - the
+    # orchestrator still validates/repairs the JSON it gets back.
+    lite_llm_kwargs: dict = {"drop_params": True}
     if api_key:
         lite_llm_kwargs["api_key"] = api_key
     if api_base := os.getenv("NEBIUS_API_BASE"):
