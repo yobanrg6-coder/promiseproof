@@ -20,7 +20,9 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import re
 import threading
+import unicodedata
 import uuid
 from pathlib import Path
 from typing import Any, Protocol
@@ -44,6 +46,23 @@ DEFAULT_JSON_PATH = Path(__file__).resolve().parent.parent / "data" / "ledger.js
 
 def utcnow_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat(timespec="microseconds")
+
+
+# Typographic variants an LLM freely swaps in between runs - fold them so the
+# dedup key is stable regardless of which the model emitted this time.
+_QUOTE_FOLD = str.maketrans({
+    "‘": "'", "’": "'", "‚": "'", "‛": "'",
+    "“": '"', "”": '"', "„": '"', "‟": '"',
+    "–": "-", "—": "-", "―": "-", " ": " ",
+})
+
+
+def _norm_key_text(s: str) -> str:
+    """Normalize a string for use in the dedup key: NFKC, fold smart
+    quotes/dashes, collapse whitespace, casefold. Two extractions of the same
+    announcement that differ only in quote style or spacing must collide."""
+    s = unicodedata.normalize("NFKC", s or "").translate(_QUOTE_FOLD)
+    return re.sub(r"\s+", " ", s).strip().casefold()
 
 
 class PromiseBackend(Protocol):
@@ -234,14 +253,17 @@ def admit_promise(
 
     # Idempotent on (company, deadline, verbatim quote): re-running the same
     # announcement through the demo pipeline must not pile duplicate rows onto
-    # the shared public scorecard.
+    # the shared public scorecard. The quote/company are normalized (NFKC,
+    # smart-quote and dash folding, whitespace collapse, casefold) so a model
+    # that renders the same sentence with curly quotes on one run and straight
+    # quotes on the next still collides.
     be = _backend(backend)
-    key = (company.strip().lower(), deadline_date.strip(), source_quote.strip())
+    key = (_norm_key_text(company), deadline_date.strip(), _norm_key_text(source_quote))
     for existing in be.all():
         if (
-            existing.get("company", "").strip().lower(),
+            _norm_key_text(existing.get("company", "")),
             existing.get("deadline_date", "").strip(),
-            existing.get("source_quote", "").strip(),
+            _norm_key_text(existing.get("source_quote", "")),
         ) == key:
             return existing["id"]
 

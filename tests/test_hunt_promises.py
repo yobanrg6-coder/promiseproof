@@ -311,6 +311,24 @@ def test_due_for_check_stops_retrying_stale_unverifiable():
     assert promises.due_for_check(check_date=dt.date(2026, 8, 27), backend=be) == []
 
 
+def test_admit_promise_dedups_across_smart_quote_and_whitespace_variants():
+    """The same announcement re-run through the pipeline can come back with
+    curly quotes one time and straight quotes the next, or with different
+    spacing - it must still collide on the dedup key, not stack a second row."""
+    be = InMemoryBackend()
+    common = {
+        "company": "Acme", "promise_text": "ship X", "source_url": "https://example.com",
+        "announced_date": "2024-01-01", "deadline_raw": "Q2 2024", "deadline_date": "2024-06-30",
+        "observable_outcome": "Feature X on the dashboard",
+        "check_keywords": ["Feature X", "Acme Dashboard"], "backend": be,
+    }
+    id1 = promises.admit_promise(source_quote='We will ship "Feature X" by Q2 2024.', **common)
+    id2 = promises.admit_promise(source_quote="We will ship “Feature X”  by Q2 2024.", **common)
+    id3 = promises.admit_promise(source_quote='we will ship "feature x" by q2 2024.', **{**common, "company": " acme "})
+    assert id1 == id2 == id3
+    assert len(be.all()) == 1
+
+
 def test_due_for_check_keeps_rechecking_partially_fulfilled():
     """A PARTIALLY_FULFILLED promise past its deadline stays in the cycle: the
     missing half can ship later and flip it to FULFILLED_LATE (BUG-08)."""

@@ -194,7 +194,7 @@ async def test_audit_or_skip_catches_timeout_and_returns_none():
         mock_run.side_effect = sleep_forever
 
         with patch("agents.promise_orchestrator.AUDITOR_TIMEOUT_SECONDS", 0.05):
-            res = await orch._audit_or_skip(_valid_extraction())
+            res = await orch._audit_or_skip(_valid_extraction(), auditor=object())
             assert res is None
 
 
@@ -226,6 +226,14 @@ def test_strip_model_scaffolding_handles_unclosed_think():
     raw = f"<think>I am still reasoning and never stopped</think> some words {_PAYLOAD}"
     cleaned = _strip_model_scaffolding(raw)
     assert PromiseAudit.model_validate_json(cleaned).agrees_falsifiable is True
+
+
+def test_strip_model_scaffolding_handles_whitespace_in_closing_think_tag():
+    # Some models emit "</think >" (with a space) - the close must still match.
+    raw = f"<think>\nreasoning here\n</think >\n{_PAYLOAD}"
+    assert PromiseAudit.model_validate_json(_strip_model_scaffolding(raw)).agrees_falsifiable is True
+    raw2 = f"<think>reasoning</think\n>{_PAYLOAD}"
+    assert PromiseAudit.model_validate_json(_strip_model_scaffolding(raw2)).agrees_falsifiable is True
 
 
 def test_strip_model_scaffolding_leaves_plain_json_untouched():

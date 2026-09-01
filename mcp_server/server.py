@@ -119,11 +119,20 @@ def admit_promise(
 
 
 @mcp.tool()
-def run_verification_cycle() -> dict:
-    """Re-check every promise whose deadline has passed against its live
-    evidence page (zero LLM) and persist any status change. Returns how many
-    were checked, which changed, and the fresh scorecard."""
-    result = run_cycle(check_date=dt.datetime.now(dt.timezone.utc).date())
+def run_verification_cycle(check_date: str = "") -> dict:
+    """Re-check every promise whose deadline has passed against its evidence
+    page (zero LLM) and persist any status change. Returns how many were
+    checked, which changed, and the fresh scorecard.
+
+    check_date: optional YYYY-MM-DD to run the cycle "as of" a past date
+    (the Wayback probe then looks for a capture on/before that date). Omit
+    for today.
+    """
+    try:
+        as_of = dt.date.fromisoformat(check_date) if check_date else dt.datetime.now(dt.timezone.utc).date()
+    except ValueError:
+        return {"error": f"check_date must be YYYY-MM-DD, got {check_date!r}"}
+    result = run_cycle(check_date=as_of)
     return {"checked": result["checked"], "changed": result["changed"],
             "errors": result["errors"], "scorecard": result["scorecard"]}
 

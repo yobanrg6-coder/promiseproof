@@ -142,7 +142,9 @@ async function loadHealth(){
 function kpi(n,l){ return `<div class="kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`; }
 
 async function loadScorecard(){
-  const c = await (await fetch('/api/scorecard')).json();
+  let c;
+  try{ c = await (await fetch('/api/scorecard')).json(); }
+  catch{ $('#kpis').innerHTML = '<span class="muted">could not load the scorecard</span>'; return; }
   const o = c.overall;
   $('#kpis').innerHTML =
     kpi(o.total,'Tracked') + kpi(o.resolved,'Resolved') +
@@ -159,7 +161,9 @@ async function loadScorecard(){
 }
 
 async function loadPromises(){
-  const {promises} = await (await fetch('/api/promises')).json();
+  let promises;
+  try{ ({promises} = await (await fetch('/api/promises')).json()); }
+  catch{ $('#promiseList').innerHTML = '<span class="muted">could not load promises</span>'; return; }
   $('#promiseList').innerHTML = promises.map(p => `
     <div class="promise">
       <div class="top">
@@ -204,8 +208,8 @@ $('#runBtn').addEventListener('click', async () => {
         const line = buf.slice(0, i).trim(); buf = buf.slice(i + 2);
         if(!line.startsWith('data:')) continue;
         const ev = JSON.parse(line.slice(5).trim());
-        if(ev.type === 'status') addEv(`<span class="stage">[${ev.stage}] ${esc(ev.agent)}</span> ${esc(ev.message)}`);
-        else if(ev.type === 'agent_result') addEv(`<span class="stage">[${ev.stage}] ${esc(ev.agent)}</span><pre>${esc(JSON.stringify(ev.data, null, 2))}</pre>`);
+        if(ev.type === 'status') addEv(`<span class="stage">[${esc(ev.stage)}] ${esc(ev.agent)}</span> ${esc(ev.message)}`);
+        else if(ev.type === 'agent_result') addEv(`<span class="stage">[${esc(ev.stage)}] ${esc(ev.agent)}</span><pre>${esc(JSON.stringify(ev.data, null, 2))}</pre>`);
         else if(ev.type === 'decision_stop') addEv('STOP — ' + esc(ev.message), 'err');
         else if(ev.type === 'complete'){ addEv('ADMITTED — ' + esc(ev.message), 'ok'); loadScorecard(); loadPromises(); }
         else if(ev.type === 'error') addEv('ERROR — ' + esc(ev.message), 'err');

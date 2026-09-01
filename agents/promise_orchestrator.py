@@ -54,21 +54,23 @@ class AgentExecutionError(RuntimeError):
     pass
 
 
-_THINK_BLOCK = re.compile(r"<think\b[^>]*>.*?</think>", re.DOTALL | re.IGNORECASE)
+_THINK_BLOCK = re.compile(r"<think\b[^>]*>.*?</think\s*>", re.DOTALL | re.IGNORECASE)
+_THINK_CLOSE = re.compile(r"</think\s*>", re.IGNORECASE)
 _FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.IGNORECASE)
 
 
 def _strip_model_scaffolding(text: str) -> str:
     """Best-effort removal of reasoning-model scaffolding around a JSON payload.
 
-    Handles, in order: complete ``<think>...</think>`` blocks; a leftover
-    unclosed ``<think>`` (or trailing ``</think>``) from a truncated trace; a
-    ```json ... ``` fence; finally, if what's left still isn't bare JSON, the
-    slice from the first ``{`` / ``[`` to its matching last ``}`` / ``]``.
+    Handles, in order: complete ``<think>...</think>`` blocks (closing tag may
+    carry whitespace: ``</think >``); a leftover unclosed ``<think>`` (or
+    trailing ``</think>``) from a truncated trace; a ```json ... ``` fence;
+    finally, if what's left still isn't bare JSON, the slice from the first
+    ``{`` / ``[`` to its matching last ``}`` / ``]``.
     """
     text = _THINK_BLOCK.sub("", text).strip()
-    if "</think>" in text:  # unclosed opener consumed the block above
-        text = text.rsplit("</think>", 1)[-1].strip()
+    if _THINK_CLOSE.search(text):  # unclosed opener consumed the block above
+        text = _THINK_CLOSE.split(text)[-1].strip()
     text = _FENCE.sub("", text.strip()).strip()
     if text[:1] not in ("{", "["):
         start = min((i for i in (text.find("{"), text.find("[")) if i != -1), default=-1)
@@ -135,8 +137,7 @@ class PromiseLedgerOrchestrator:
             raise AgentExecutionError(f"{label}: bad {output_model.__name__}: {exc}") from exc
 
     # --------------------------- pipeline ------------------------------- #
-    async def _audit_or_skip(self, extraction: PromiseExtraction) -> PromiseAudit | None:
-        auditor = create_promise_auditor_agent(api_key=self.api_key)
+    async def _audit_or_skip(self, extraction: PromiseExtraction, auditor) -> PromiseAudit | None:
         prompt = f"Audit this extracted promise:\n{extraction.model_dump_json(indent=2)}"
         try:
             return await asyncio.wait_for(
@@ -157,7 +158,10 @@ class PromiseLedgerOrchestrator:
         announced_date: str,
         backend: Any = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
+        # Both agents are built once for the whole re-extraction loop, not per
+        # iteration - construction is cheap but pointless to repeat.
         extractor = create_promise_extractor_agent(api_key=self.api_key, model_name=self.model_name)
+        auditor = create_promise_auditor_agent(api_key=self.api_key)
         base_prompt = (
             f"--- SOURCE URL ---\n{source_url}\n"
             f"--- PUBLISHED ---\n{announced_date}\n"
@@ -183,7 +187,7 @@ class PromiseLedgerOrchestrator:
 
             yield {"type": "status", "stage": 2, "agent": "PromiseAuditorAgent",
                    "message": "Adversarially auditing the extraction on a second, smaller Nemotron model..."}
-            audit = await self._audit_or_skip(extraction)
+            audit = await self._audit_or_skip(extraction, auditor)
             if audit is None:
                 yield {"type": "status", "stage": 2, "agent": "PromiseAuditorAgent",
                        "message": "Auditor unavailable this run - proceeding on extractor + gate alone."}
