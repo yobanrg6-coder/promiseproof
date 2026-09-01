@@ -164,7 +164,7 @@ echo -n "your_nebius_api_key" | gcloud secrets create nebius-api-key --data-file
 
 gcloud run deploy promiseproof --source . --region=us-central1 \
     --allow-unauthenticated --min-instances=1 --max-instances=1 \
-    --set-env-vars MODEL=nvidia/Llama-3_3-Nemotron-Super-49B-v1,AUDITOR_MODEL=nvidia/Llama-3_1-Nemotron-Nano-8B-v1,LEDGER_BACKEND=firestore,GCP_PROJECT=<your-new-project-id> \
+    --set-env-vars MODEL=nvidia/nemotron-3-super-120b-a12b,AUDITOR_MODEL=nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B,LEDGER_BACKEND=firestore,GCP_PROJECT=<your-new-project-id> \
     --set-secrets NEBIUS_API_KEY=nebius-api-key:latest
 ```
 

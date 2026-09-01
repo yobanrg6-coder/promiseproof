@@ -17,7 +17,7 @@ from google.adk.models.lite_llm import LiteLlm
 
 from agents.promise_schemas import PromiseExtraction
 
-DEFAULT_MODEL = "nvidia/Llama-3_3-Nemotron-Super-49B-v1"
+DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b"
 
 SYSTEM_INSTRUCTION = """You extract FALSIFIABLE product promises from company announcements for a public
 accountability ledger. The ledger only holds promises that can later be checked TRUE or FALSE against a
@@ -41,6 +41,7 @@ DOES NOT QUALIFY (set is_falsifiable=false, give rejection_reason, invent NOTHIN
   "More is coming soon."                               (no observable outcome, no real deadline)
 
 When it qualifies, fill every field:
+  - company: the company or project making the promise (never leave this blank when known).
   - source_quote: the verbatim sentence(s) stating the promise, copied exactly.
   - promise_text: one neutral line - what was promised, no spin.
   - observable_outcome: the concrete thing that must appear on a public page for this to be FULFILLED.

@@ -141,7 +141,7 @@
     <div class="row">
       <div class="card blue">
         <div class="kicker">Stage 1 &mdash; ADK LlmAgent + LiteLlm, via Nebius Token Factory</div>
-        <h3>PromiseExtractorAgent <span class="sub">(NVIDIA Nemotron Super)</span></h3>
+        <h3>PromiseExtractorAgent <span class="sub">(NVIDIA Nemotron 3 Super, 120B MoE)</span></h3>
         <p>Pulls one falsifiable promise from the text: verbatim source quote, normalized
         deadline, observable outcome, machine-checkable keywords. Pydantic output schema.</p>
         <div class="path">agents/promise_extractor.py</div>
@@ -149,7 +149,7 @@
       <div class="arrow">&#9654;</div>
       <div class="card purple">
         <div class="kicker">Stage 2 &mdash; ADK LlmAgent, different-sized NVIDIA model</div>
-        <h3>PromiseAuditorAgent <span class="sub">(NVIDIA Nemotron Nano)</span></h3>
+        <h3>PromiseAuditorAgent <span class="sub">(NVIDIA Nemotron 3 Nano, 30B)</span></h3>
         <p>Adversarial second read: &ldquo;is this actually checkable?&rdquo; A rejection returns
         one concrete re-extraction instruction. Degrades gracefully if unavailable.</p>
         <div class="path">agents/promise_auditor.py</div>
@@ -228,8 +228,8 @@
   <footer>
     <div><b>Deployment:</b> Google Cloud Run (source deploy, new GCP project) &middot; Nebius key in
     Secret Manager &middot; fully offline test suite (no network, no LLM)</div>
-    <div><b>Model discipline:</b> nvidia/Llama-3_3-Nemotron-Super-49B-v1 (extractor) +
-    nvidia/Llama-3_1-Nemotron-Nano-8B-v1 (auditor), via Nebius Token Factory &mdash; pinned ids</div>
+    <div><b>Model discipline:</b> nvidia/nemotron-3-super-120b-a12b (extractor) +
+    nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B (auditor), via Nebius Token Factory &mdash; open NVIDIA models</div>
   </footer>
 
 </body>
