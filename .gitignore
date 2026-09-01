@@ -1,0 +1,30 @@
+# Secrets - never commit
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Ledger data: data/ledger.json (the seeded demo ledger) IS committed as the
+# baseline scorecard. Logs and old sqlite snapshots are not.
+data/*.log
+data/*.db
+data/*.db-journal
+data/*backup*.db
+
+# Internal working notes and submission-prep docs (for the developer only,
+# not something a judge browsing this repo needs to see).
+BITACORA_PROYECTO.md
+HANDOFF_28ago.md
+PITCH_VIDEO_SCRIPT.md
+SUBMISSION_DEVPOST.md
+
+# OS
+.DS_Store
+Thumbs.db

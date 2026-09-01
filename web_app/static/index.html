@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromiseProof</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#14171c; --panel-2:#1b1f26; --line:#262b33;
+    --ink:#e8eaed; --ink-dim:#9aa3ad; --accent:#5b9dff;
+    --ok:#37c871; --late:#e0b341; --bad:#ef5b5b; --wait:#7c8592; --unk:#8a6dd6;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:'Plus Jakarta Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  header{border-bottom:1px solid var(--line);padding:18px 26px;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+  header h1{font-size:19px;margin:0;font-weight:700;letter-spacing:.2px}
+  header .sub{color:var(--ink-dim);font-size:13px}
+  header .meta{font-family:var(--mono);font-size:11px;color:var(--ink-dim)}
+  main{display:grid;grid-template-columns:1.15fr .85fr;gap:24px;padding:24px 26px;max-width:1400px;margin:0 auto}
+  @media(max-width:960px){main{grid-template-columns:1fr}}
+  h2{font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--ink-dim);margin:0 0 12px;font-weight:600}
+  .sec-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+  .sec-head h2{margin:0}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:12px;padding:7px 12px}
+  button.ghost:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  .note{font-size:12px;color:var(--ink-dim);margin-top:10px;font-family:var(--mono)}
+  .footnote{font-size:11px;color:var(--ink-dim);margin-top:12px;line-height:1.5}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px}
+  .kpis{display:flex;gap:14px;flex-wrap:wrap}
+  .kpi{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;flex:1;min-width:110px}
+  .kpi .n{font-size:26px;font-weight:700;font-family:var(--mono)}
+  .kpi .l{font-size:11px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.6px;margin-top:2px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--ink-dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.6px}
+  td.num,th.num{text-align:right;font-family:var(--mono)}
+  .chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;font-family:var(--mono);white-space:nowrap}
+  .s-FULFILLED{background:rgba(55,200,113,.14);color:var(--ok)}
+  .s-FULFILLED_LATE,.s-PARTIALLY_FULFILLED{background:rgba(224,179,65,.14);color:var(--late)}
+  .s-DELAYED,.s-ABANDONED{background:rgba(239,91,91,.14);color:var(--bad)}
+  .s-PENDING{background:rgba(124,133,146,.16);color:var(--wait)}
+  .s-UNVERIFIABLE{background:rgba(138,109,214,.16);color:var(--unk)}
+  .promise{border-bottom:1px solid var(--line);padding:12px 0}
+  .promise:last-child{border-bottom:0}
+  .promise .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+  .promise .co{font-weight:700;font-size:13px}
+  .promise .txt{font-size:13px;margin:4px 0 6px}
+  .promise .q{font-size:12px;color:var(--ink-dim);border-left:2px solid var(--line);padding-left:8px;font-style:italic}
+  .promise .foot{font-size:11px;color:var(--ink-dim);font-family:var(--mono);margin-top:6px;display:flex;gap:14px;flex-wrap:wrap}
+  label{display:block;font-size:12px;color:var(--ink-dim);margin:12px 0 4px;text-transform:uppercase;letter-spacing:.5px}
+  textarea,input[type=text],input[type=date]{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:10px;font-family:var(--sans);font-size:13px}
+  textarea{min-height:150px;resize:vertical;font-family:var(--mono);font-size:12px}
+  button{background:var(--accent);color:#04101f;border:0;border-radius:8px;padding:11px 18px;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--sans)}
+  button:disabled{opacity:.5;cursor:default}
+  .stream{margin-top:16px;font-family:var(--mono);font-size:12px;background:#0e1116;border:1px solid var(--line);border-radius:8px;padding:12px;max-height:420px;overflow:auto}
+  .ev{padding:6px 0;border-bottom:1px dashed var(--line)}
+  .ev:last-child{border-bottom:0}
+  .ev .stage{color:var(--accent)}
+  .ev.err{color:var(--bad)}
+  .ev.ok{color:var(--ok)}
+  .ev pre{white-space:pre-wrap;margin:4px 0 0;color:var(--ink-dim)}
+  .muted{color:var(--ink-dim);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>PromiseProof</h1>
+    <div class="sub">A machine-verifiable record of public product promises. Status set by a zero-LLM verifier against official pages.</div>
+  </div>
+  <div class="meta" id="healthMeta">loading…</div>
+</header>
+
+<main>
+  <div>
+    <div class="sec-head">
+      <h2>Accountability scorecard</h2>
+      <button id="reverifyBtn" class="ghost">Re-verify all vs. live pages</button>
+    </div>
+    <div class="panel">
+      <div class="kpis" id="kpis"><span class="muted">loading…</span></div>
+      <div id="verifyNote" class="note" hidden></div>
+      <div class="footnote">On-time rate = kept on time &divide; resolved promises whose ship date could be
+      established. <b>Fulfilled&nbsp;(undated)</b> promises &mdash; delivery proven, but the page carried no
+      date &mdash; are excluded from the rate rather than assumed on time.</div>
+    </div>
+    <div class="panel">
+      <h2>By company</h2>
+      <div style="overflow-x:auto">
+        <table id="companyTable">
+          <thead><tr>
+            <th>Company</th><th class="num">Resolved</th><th class="num">On&nbsp;time</th>
+            <th class="num">Undated</th><th class="num">Late/partial</th><th class="num">Delayed</th>
+            <th class="num">Abandoned</th><th class="num">Pending</th><th class="num">On-time&nbsp;%</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Promises</h2>
+      <div id="promiseList"><span class="muted">loading…</span></div>
+    </div>
+  </div>
+
+  <div>
+    <h2>Test the pipeline</h2>
+    <div class="panel">
+      <p class="muted">Paste a real company announcement. The extractor (NVIDIA Nemotron, via Nebius) proposes
+      a falsifiable promise, a second Nemotron model audits it, and a deterministic gate decides admission — streamed live.</p>
+      <label for="atext">Announcement text</label>
+      <textarea id="atext">At Google I/O we shared that Gemini 1.5 Pro will offer a 2 million token context window to all developers through the Gemini API and Google AI Studio later this year, up from the 1 million token window available today.</textarea>
+      <label for="aurl">Source URL (optional)</label>
+      <input type="text" id="aurl" value="https://blog.google/technology/ai/google-gemini-update-flash-ai-assistant-io-2024/">
+      <label for="adate">Announced date</label>
+      <input type="date" id="adate" value="2024-05-14">
+      <div style="margin-top:16px"><button id="runBtn">Run pipeline</button></div>
+      <div class="stream" id="stream" hidden></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Only ever emit an http(s) URL into an href - blocks javascript:/data: and
+// anything else a pasted announcement could smuggle into the ledger.
+const safeUrl = u => /^https?:\/\//i.test(String(u ?? "").trim()) ? String(u).trim() : "";
+
+async function loadHealth(){
+  try{
+    const h = await (await fetch('/api/health')).json();
+    $('#healthMeta').textContent = `model ${h.model} · backend ${h.backend}`;
+  }catch{ $('#healthMeta').textContent = ''; }
+}
+
+function kpi(n,l){ return `<div class="kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`; }
+
+async function loadScorecard(){
+  const c = await (await fetch('/api/scorecard')).json();
+  const o = c.overall;
+  $('#kpis').innerHTML =
+    kpi(o.total,'Tracked') + kpi(o.resolved,'Resolved') +
+    kpi(o.kept_on_time,'Kept on time') + kpi(o.kept_undated,'Fulfilled, undated') +
+    kpi(o.kept_late_or_partial,'Late / partial') + kpi(o.delayed + o.abandoned,'Broken') +
+    kpi(o.on_time_rate_pct==null ? '—' : o.on_time_rate_pct + '%','On-time rate');
+  const tb = $('#companyTable tbody');
+  tb.innerHTML = c.companies.map(x => `<tr>
+    <td>${esc(x.company)}</td><td class="num">${x.resolved}</td><td class="num">${x.kept_on_time}</td>
+    <td class="num">${x.kept_undated}</td><td class="num">${x.kept_late_or_partial}</td><td class="num">${x.delayed}</td>
+    <td class="num">${x.abandoned}</td><td class="num">${x.pending}</td>
+    <td class="num">${x.on_time_rate_pct==null ? '—' : x.on_time_rate_pct + '%'}</td>
+  </tr>`).join('') || `<tr><td colspan="9" class="muted">No promises yet — run <code>python -m ledger.seed</code>.</td></tr>`;
+}
+
+async function loadPromises(){
+  const {promises} = await (await fetch('/api/promises')).json();
+  $('#promiseList').innerHTML = promises.map(p => `
+    <div class="promise">
+      <div class="top">
+        <span class="co">${esc(p.company)}</span>
+        <span class="chip s-${esc(p.status)}">${esc(p.status)}</span>
+      </div>
+      <div class="txt">${esc(p.promise_text)}</div>
+      <div class="q">“${esc(p.source_quote)}”</div>
+      <div class="foot">
+        <span>deadline ${esc(p.deadline_date)}</span>
+        ${p.verification_method ? `<span title="how this verdict was reached">via ${esc(p.verification_method)}${p.evidence_captured_at ? ' · ' + esc(p.evidence_captured_at) : ''}</span>` : ''}
+        ${safeUrl(p.source_url) ? `<a href="${esc(safeUrl(p.source_url))}" target="_blank" rel="noopener">source</a>` : ''}
+        ${safeUrl(p.evidence_url) ? `<a href="${esc(safeUrl(p.evidence_url))}" target="_blank" rel="noopener">evidence</a>` : ''}
+      </div>
+      ${p.status_reason ? `<div class="foot"><span>${esc(p.status_reason)}</span></div>` : ''}
+    </div>`).join('') || `<span class="muted">No promises yet.</span>`;
+}
+
+function addEv(html, cls=''){
+  const s = $('#stream'); s.hidden = false;
+  const d = document.createElement('div'); d.className = 'ev ' + cls; d.innerHTML = html;
+  s.appendChild(d); s.scrollTop = s.scrollHeight;
+}
+
+$('#runBtn').addEventListener('click', async () => {
+  const btn = $('#runBtn'); btn.disabled = true;
+  $('#stream').innerHTML = ''; $('#stream').hidden = false;
+  const body = JSON.stringify({
+    announcement_text: $('#atext').value,
+    source_url: $('#aurl').value,
+    announced_date: $('#adate').value,
+  });
+  try{
+    const resp = await fetch('/api/extract-stream', {method:'POST', headers:{'Content-Type':'application/json'}, body});
+    if(!resp.ok){ addEv('HTTP ' + resp.status + ' — ' + esc(await resp.text()), 'err'); btn.disabled = false; return; }
+    const reader = resp.body.getReader(); const dec = new TextDecoder(); let buf = '';
+    while(true){
+      const {value, done} = await reader.read(); if(done) break;
+      buf += dec.decode(value, {stream:true});
+      let i;
+      while((i = buf.indexOf('\n\n')) >= 0){
+        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 2);
+        if(!line.startsWith('data:')) continue;
+        const ev = JSON.parse(line.slice(5).trim());
+        if(ev.type === 'status') addEv(`<span class="stage">[${ev.stage}] ${esc(ev.agent)}</span> ${esc(ev.message)}`);
+        else if(ev.type === 'agent_result') addEv(`<span class="stage">[${ev.stage}] ${esc(ev.agent)}</span><pre>${esc(JSON.stringify(ev.data, null, 2))}</pre>`);
+        else if(ev.type === 'decision_stop') addEv('STOP — ' + esc(ev.message), 'err');
+        else if(ev.type === 'complete'){ addEv('ADMITTED — ' + esc(ev.message), 'ok'); loadScorecard(); loadPromises(); }
+        else if(ev.type === 'error') addEv('ERROR — ' + esc(ev.message), 'err');
+      }
+    }
+  }catch(e){ addEv('client error — ' + esc(e.message), 'err'); }
+  btn.disabled = false;
+});
+
+$('#reverifyBtn').addEventListener('click', async () => {
+  const b = $('#reverifyBtn'); const note = $('#verifyNote');
+  b.disabled = true; note.hidden = false;
+  note.textContent = 'Re-fetching every evidence page and re-deciding each status (zero-LLM)…';
+  try{
+    const r = await fetch('/api/verify-cycle', {method:'POST'});
+    if(!r.ok){ note.textContent = 'Re-verify failed: HTTP ' + r.status + ' — ' + esc(await r.text()); b.disabled = false; return; }
+    const d = await r.json();
+    const chg = (d.changed && d.changed.length)
+      ? d.changed.map(x => `${esc(x.company)} ${x.from}→${x.to}`).join(', ')
+      : 'no status changes';
+    note.textContent = `Re-verified ${d.checked} promise(s) — ${chg}. ${d.errors} error(s).`;
+    await loadScorecard(); await loadPromises();
+  }catch(e){ note.textContent = 'Re-verify error — ' + esc(e.message); }
+  b.disabled = false;
+});
+
+loadHealth(); loadScorecard(); loadPromises();
+</script>
+</body>
+</html>

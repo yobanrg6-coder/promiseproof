@@ -1,0 +1,19 @@
+# PromiseProof - runtime dependencies.
+# Pinned to exact versions: the hackathon judging window runs for a month, and
+# a breaking release of ADK / fastmcp / litellm mid-window must not change
+# what a fresh `pip install` produces.
+google-genai==2.18.1
+google-adk==2.7.0
+# LiteLLM is ADK's bridge to non-Google models - it's what actually speaks to
+# Nebius Token Factory's OpenAI-compatible endpoint (see agents/promise_extractor.py,
+# agents/promise_auditor.py). Required for `from google.adk.models.lite_llm import LiteLlm`.
+litellm==1.99.0
+fastmcp==3.4.7
+fastapi==0.141.1
+uvicorn==0.52.3
+pydantic==2.13.4
+python-dotenv==1.2.2
+httpx==0.28.1
+aiofiles==25.1.0
+# Only imported when LEDGER_BACKEND=firestore (the default is a local JSON file).
+google-cloud-firestore==2.28.1

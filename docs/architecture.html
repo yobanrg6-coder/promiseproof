@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0a0b10;
+    --ink: #e8eaf0;
+    --muted: #9aa3b2;
+    --faint: #6b7280;
+    --card: #14161d;
+    --card-border: #262a35;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --blue: #5b9dff;
+    --green: #46d18a;
+    --purple: #b98bff;
+    --amber: #f2b45b;
+    --red: #ff6b6b;
+  }
+  html, body { background: var(--bg); }
+  body {
+    width: 1500px;
+    font-family: var(--sans);
+    color: var(--ink);
+    padding: 44px 48px 36px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- header ---------- */
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 40px; }
+  h1 { font-size: 34px; font-weight: 800; letter-spacing: -0.5px; }
+  h1 .accent { color: var(--blue); }
+  .lede { margin-top: 10px; max-width: 860px; color: var(--muted); font-size: 15px; line-height: 1.5; }
+  .lede b { color: var(--ink); }
+  .meta { text-align: right; font-family: var(--mono); font-size: 12.5px; color: var(--faint); line-height: 1.7; white-space: nowrap; }
+  .meta .strong { color: var(--muted); }
+
+  /* ---------- legend ---------- */
+  .legend { display: flex; gap: 10px; margin: 26px 0 10px; }
+  .chip { font-family: var(--mono); font-size: 12px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--card-border); color: var(--muted); }
+  .chip.b { border-color: rgba(91,157,255,.5); color: var(--blue); }
+  .chip.g { border-color: rgba(70,209,138,.5); color: var(--green); }
+
+  /* ---------- band / rows ---------- */
+  .band { display: grid; grid-template-columns: 26px 1fr; gap: 16px; margin-top: 14px; }
+  .band-label {
+    writing-mode: vertical-rl; transform: rotate(180deg);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 2px;
+    color: var(--faint); text-transform: uppercase; padding: 4px 0;
+    border-left: 2px solid var(--card-border);
+  }
+  .row { display: flex; align-items: stretch; gap: 14px; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 14px; padding: 18px 20px; flex: 1;
+  }
+  .card .kicker { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-bottom: 6px; }
+  .card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .card h3 .sub { font-weight: 400; font-size: 14px; color: var(--muted); }
+  .card p { font-size: 13.5px; line-height: 1.5; color: var(--muted); }
+  .card p b { color: var(--ink); }
+  .card .path { margin-top: 10px; font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
+  .card.blue { border-color: rgba(91,157,255,.35); }
+  .card.blue h3 { color: var(--blue); }
+  .card.purple { border-color: rgba(185,139,255,.35); }
+  .card.purple h3 { color: var(--purple); }
+  .card.green { border-color: rgba(70,209,138,.35); }
+  .card.green h3 { color: var(--green); }
+  .card.amber { border-color: rgba(242,180,91,.35); }
+  .card.amber h3 { color: var(--amber); }
+
+  .arrow { align-self: center; color: var(--faint); font-size: 20px; flex: 0 0 auto; }
+  .arrow-down { text-align: center; color: var(--faint); font-size: 18px; margin: 8px 0 0 42px; }
+
+  .loopback {
+    align-self: center; flex: 0 0 132px; text-align: center;
+    font-family: var(--mono); font-size: 11px; color: var(--purple);
+    border: 1px dashed rgba(185,139,255,.5); border-radius: 10px; padding: 8px 6px; line-height: 1.4;
+  }
+
+  /* ---------- status chips ---------- */
+  .statuses { margin-top: 4px; }
+  .statuses .kicker { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-bottom: 10px; }
+  .status-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .s { font-family: var(--mono); font-size: 11.5px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--card-border); color: var(--muted); }
+  .s.ok { border-color: rgba(70,209,138,.5); color: var(--green); }
+  .s.late { border-color: rgba(242,180,91,.5); color: var(--amber); }
+  .s.bad { border-color: rgba(255,107,107,.5); color: var(--red); }
+  .s.dim { border-color: rgba(185,139,255,.45); color: var(--purple); }
+  .seed { font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+  .seed b { color: var(--ink); }
+
+  /* ---------- footer ---------- */
+  footer { display: flex; justify-content: space-between; gap: 40px; margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--card-border); }
+  footer div { font-family: var(--mono); font-size: 11.5px; color: var(--faint); line-height: 1.6; }
+  footer b { color: var(--muted); }
+</style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1><span class="accent">Promise</span>Proof &mdash; Architecture</h1>
+      <p class="lede">A machine-verifiable record of public product promises. Two differently-sized
+      NVIDIA Nemotron models only <i>propose</i> structure; a deterministic gate admits, and a
+      <b>zero-LLM</b> verifier decides every outcome against the official page <i>as archived on the
+      deadline</i>.</p>
+    </div>
+    <div class="meta">
+      Nebius x NVIDIA Global AI Hackathon<br>
+      <span class="strong">Fork of The Promise Ledger, migrated off Gemini/Gemma</span><br>
+      ADK &middot; NVIDIA Nemotron &middot; Nebius Token Factory &middot; MCP &middot; Wayback &middot; Cloud Run
+    </div>
+  </header>
+
+  <div class="legend">
+    <span class="chip">Client</span>
+    <span class="chip b">LLM proposes structure</span>
+    <span class="chip g">Zero-LLM decides &amp; verifies</span>
+  </div>
+
+  <!-- CLIENT -->
+  <div class="band">
+    <div class="band-label">Client</div>
+    <div class="row">
+      <div class="card">
+        <div class="kicker">Browser UI &mdash; single self-contained page</div>
+        <h3>Scorecard + live pipeline stream</h3>
+        <p>Paste a company announcement &rarr; watch each agent stage arrive over Server-Sent
+        Events. Reads the verified scorecard and per-company on-time rate.</p>
+        <div class="path">web_app/static/index.html &nbsp;&middot;&nbsp; POST /api/extract-stream (SSE) &nbsp;&middot;&nbsp; GET /api/scorecard, /api/promises</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXTRACTION PIPELINE -->
+  <div class="band">
+    <div class="band-label">Extraction pipeline</div>
+    <div class="row">
+      <div class="card blue">
+        <div class="kicker">Stage 1 &mdash; ADK LlmAgent + LiteLlm, via Nebius Token Factory</div>
+        <h3>PromiseExtractorAgent <span class="sub">(NVIDIA Nemotron Super)</span></h3>
+        <p>Pulls one falsifiable promise from the text: verbatim source quote, normalized
+        deadline, observable outcome, machine-checkable keywords. Pydantic output schema.</p>
+        <div class="path">agents/promise_extractor.py</div>
+      </div>
+      <div class="arrow">&#9654;</div>
+      <div class="card purple">
+        <div class="kicker">Stage 2 &mdash; ADK LlmAgent, different-sized NVIDIA model</div>
+        <h3>PromiseAuditorAgent <span class="sub">(NVIDIA Nemotron Nano)</span></h3>
+        <p>Adversarial second read: &ldquo;is this actually checkable?&rdquo; A rejection returns
+        one concrete re-extraction instruction. Degrades gracefully if unavailable.</p>
+        <div class="path">agents/promise_auditor.py</div>
+      </div>
+      <div class="loopback">reject &rarr;<br>re-extract<br>(max 2)</div>
+      <div class="arrow">&#9654;</div>
+      <div class="card green">
+        <div class="kicker">Stage 3 &mdash; pure Python, NO LLM</div>
+        <h3>Falsifiability gate</h3>
+        <p>Real calendar deadline, not absurd (&le; 5y), &ge; 2 distinct specific keywords,
+        substantive outcome. <b>The gate admits &mdash; the model never does.</b></p>
+        <div class="path">agents/falsifiability_gate.py</div>
+      </div>
+    </div>
+    <div class="arrow-down">&#9660;</div>
+  </div>
+
+  <!-- VERIFIED LEDGER + MCP -->
+  <div class="band">
+    <div class="band-label">Verified ledger + MCP</div>
+    <div class="row">
+      <div class="card amber">
+        <div class="kicker">Stage 4 &mdash; store + scorecard</div>
+        <h3>admit_promise() &rarr; PromiseProof ledger</h3>
+        <p>Persisted PENDING with its source quote &amp; URL. Pluggable backend: locked JSON file
+        (default, ships seeded), Firestore, or in-memory. Per-company + overall on-time rate is a
+        count, not a claim &mdash; undated fulfillments are held out of it.</p>
+        <div class="path">ledger/promises.py</div>
+      </div>
+      <div class="arrow">&#9664;&nbsp;&#9654;</div>
+      <div class="card">
+        <div class="kicker">FastMCP server &mdash; streamable-HTTP, every tool LLM-free</div>
+        <h3>Model Context Protocol interface</h3>
+        <p>get_scorecard &middot; list_promises &middot; get_promise &middot; admit_promise &middot;
+        run_verification_cycle &mdash; the same verified ledger for an agent, the web UI, or a CI job.</p>
+        <div class="path">mcp_server/server.py</div>
+      </div>
+    </div>
+    <div class="arrow-down">&#9660;</div>
+  </div>
+
+  <!-- VERIFICATION LOOP -->
+  <div class="band">
+    <div class="band-label">Verification loop</div>
+    <div class="row">
+      <div class="card green">
+        <div class="kicker">run_cycle &mdash; Cloud Run Job on Cloud Scheduler, every 6h, no API key</div>
+        <h3>Zero-LLM verifier &mdash; point-in-time</h3>
+        <p>Probe 1: the official page <b>as archived by the Wayback Machine on/before the deadline</b>
+        &mdash; keywords in that capture = kept on time, the capture date is the dated proof.
+        Probe 2: the page now. A fixed table turns the two readings into one status; every verdict
+        records how it was reached. <b>&ldquo;It shipped&rdquo; is never an inferred claim.</b></p>
+        <div class="path">ledger/verifier.py &nbsp;&middot;&nbsp; ledger/archive.py &nbsp;&middot;&nbsp; ledger/evidence.py</div>
+      </div>
+      <div class="arrow">&nbsp;</div>
+      <div class="card statuses">
+        <div class="kicker">Seven fixed statuses &mdash; decision table in ledger/README.md</div>
+        <div class="status-row">
+          <span class="s">PENDING</span>
+          <span class="s ok">FULFILLED</span>
+          <span class="s late">FULFILLED_LATE</span>
+          <span class="s late">PARTIALLY_FULFILLED</span>
+          <span class="s bad">DELAYED</span>
+          <span class="s bad">ABANDONED</span>
+          <span class="s dim">UNVERIFIABLE</span>
+        </div>
+        <p class="seed">Seeded demo: <b>14 real promises / 7 companies</b> (Anthropic, Apple, Google,
+        Meta, OpenAI, Stability AI, xAI). <b>Several verify point-in-time against an official page as
+        archived on/before the deadline</b> &mdash; the capture date is the dated proof. Outcomes kept
+        visible: 2 ABANDONED, 1 FULFILLED_LATE, 3 undated FULFILLED. On-time rate ~72%, re-run every
+        6h by the Cloud Run Job (self-healing: a transient UNVERIFIABLE clears on the next pass).</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div><b>Deployment:</b> Google Cloud Run (source deploy, new GCP project) &middot; Nebius key in
+    Secret Manager &middot; fully offline test suite (no network, no LLM)</div>
+    <div><b>Model discipline:</b> nvidia/Llama-3_3-Nemotron-Super-49B-v1 (extractor) +
+    nvidia/Llama-3_1-Nemotron-Nano-8B-v1 (auditor), via Nebius Token Factory &mdash; pinned ids</div>
+  </footer>
+
+</body>
+</html>
