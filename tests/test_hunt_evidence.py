@@ -3,12 +3,16 @@ Adversarial tests for ledger.evidence - hunting text extraction, SPA thresholds,
 No network, no LLM calls.
 """
 
+import pytest
+
 from ledger.evidence import (
     _SHELL_TEXT_THRESHOLD,
     Evidence,
     fetch_evidence,
     html_to_text,
+    is_public_http_url,
     keyword_hits,
+    looks_like_safe_url,
 )
 
 _clean_html = html_to_text  # tests exercise the real production helper
@@ -111,3 +115,51 @@ def test_fetch_evidence_empty_url():
     ev = fetch_evidence("")
     assert not ev.ok
     assert ev.error == "no evidence url"
+
+
+# =========================================================================== #
+# 5. SSRF guard: is_public_http_url / fetch_evidence must refuse internal targets
+# =========================================================================== #
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "http://169.254.169.254/latest/meta-data/",  # cloud metadata (link-local)
+        "http://metadata.google.internal/computeMetadata/v1/",
+        "http://127.0.0.1:8081/mcp",  # loopback
+        "http://localhost/admin",
+        "http://10.0.0.5/internal",  # private
+        "http://192.168.1.1/",  # private
+        "http://[::1]/",  # loopback v6
+        "file:///etc/passwd",  # non-http scheme
+        "ftp://example.com/x",
+        "not a url",
+        "",
+    ],
+)
+def test_is_public_http_url_blocks_internal_and_non_http(bad):
+    assert is_public_http_url(bad) is False
+
+
+def test_fetch_evidence_refuses_a_link_local_metadata_url_without_networking():
+    ev = fetch_evidence("http://169.254.169.254/computeMetadata/v1/")
+    assert not ev.ok
+    assert "public http(s) URL" in ev.error
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "javascript:alert(1)",
+        'https://acme.com" onmouseover="alert(1)',
+        "https://acme.com/ with a space",
+        "data:text/html,<b>x</b>",
+        "ftp://acme.com/x",
+    ],
+)
+def test_looks_like_safe_url_rejects_dangerous_values(bad):
+    assert looks_like_safe_url(bad) is False
+
+
+@pytest.mark.parametrize("ok", ["", "https://acme.com/news/x", "http://example.org/a/b?c=d#e"])
+def test_looks_like_safe_url_allows_plain_http_urls_and_empty(ok):
+    assert looks_like_safe_url(ok) is True

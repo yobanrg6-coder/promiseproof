@@ -17,6 +17,7 @@ import re
 import sys
 import time
 from collections import defaultdict, deque
+from datetime import date as _date
 
 import aiofiles
 from dotenv import load_dotenv
@@ -99,7 +100,10 @@ static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 os.makedirs(static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-MAX_ANNOUNCEMENT_CHARS = 16000
+# Must match the slice the orchestrator applies to the prompt
+# (promise_orchestrator.process_announcement_stream) so the API rejects
+# anything that would be silently truncated instead of accepting it.
+MAX_ANNOUNCEMENT_CHARS = 14000
 # Hard ceiling on one live pipeline run. The auditor step has its own internal
 # timeout; this bounds the whole extract -> audit -> re-extract loop so a
 # stalled Nebius call can't leave the SSE stream hanging with no events.
@@ -116,9 +120,14 @@ class ExtractRequest(BaseModel):
     @field_validator("announced_date")
     @classmethod
     def _check_date(cls, v: str) -> str:
-        if not _ISO_DATE.match(v.strip()):
+        v = v.strip()
+        if not _ISO_DATE.match(v):
             raise ValueError("announced_date must be YYYY-MM-DD")
-        return v.strip()
+        try:
+            _date.fromisoformat(v)  # rejects a well-formatted but impossible date (2024-02-30)
+        except ValueError as exc:
+            raise ValueError(f"announced_date is not a real calendar date: {v}") from exc
+        return v
 
     @field_validator("source_url")
     @classmethod

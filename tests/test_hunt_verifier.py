@@ -76,6 +76,16 @@ def test_keyword_hits_ignores_substring_collisions_in_prose():
     assert evidence_mod.keyword_hits("Shipped on ios today.", ["iOS"]) == ["iOS"]
 
 
+def test_keyword_hits_does_not_match_a_point_release_of_a_version_keyword():
+    """A version keyword must not hit its own sub-version (regression guard for
+    BUG-04): 'iOS 18.1' shipped is not the same claim as 'iOS 18.1.1'."""
+    assert evidence_mod.keyword_hits("Now running iOS 18.1.1 on all devices.", ["iOS 18.1"]) == []
+    assert evidence_mod.keyword_hits("GPT-4.5 is now the default model.", ["GPT-4"]) == []
+    # exact and sentence-final forms still match
+    assert evidence_mod.keyword_hits("Upgraded to iOS 18.1 today.", ["iOS 18.1"]) == ["iOS 18.1"]
+    assert evidence_mod.keyword_hits("The release is iOS 18.1.", ["iOS 18.1"]) == ["iOS 18.1"]
+
+
 def test_verifier_no_false_fulfillment_from_substring_match(monkeypatch):
     """
     An unrelated page whose prose merely contains substrings of the keywords
@@ -140,6 +150,13 @@ def test_dates_near_handles_abbreviated_months():
     """3-letter month abbreviations must parse (regression guard for BUG-05)."""
     assert dt.date(2024, 10, 28) in _dates_near("Feature X released Oct 28, 2024.", "Feature X")
     assert dt.date(2024, 10, 28) in _dates_near("Feature X released 28 Oct 2024.", "Feature X")
+
+
+def test_dates_near_handles_sept_and_comma_less_us_dates():
+    """'Sept' (4-letter abbrev) and a comma-less 'Month D YYYY' must parse."""
+    assert dt.date(2024, 9, 15) in _dates_near("Feature X shipped Sept 15, 2024.", "Feature X")
+    assert dt.date(2024, 10, 28) in _dates_near("Feature X shipped October 28 2024 for all.", "Feature X")
+    assert dt.date(2024, 9, 15) in _dates_near("Feature X shipped Sept 15 2024.", "Feature X")
 
 
 def test_dates_near_handles_iso_slash_dates():

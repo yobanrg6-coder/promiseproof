@@ -215,6 +215,16 @@ Submission Period."** What changed:
   and the orchestrator's output parser strips `<think>…</think>` traces and
   code fences and, as a last resort, slices the outer JSON object before
   validating — so a Nemotron reasoning trace can't break the pipeline.
+- **Post-audit hardening** (see `git log`): SSRF guard on the verifier's
+  fetch path (`is_public_http_url` — an `evidence_url` that resolves to a
+  private/loopback/link-local/metadata address is refused, redirects
+  re-checked per hop); a version keyword no longer matches its own point
+  release (`iOS 18.1` ≠ `iOS 18.1.1`); JSON-file store takes its lock on
+  reads too (Windows `WinError 32`); `PARTIALLY_FULFILLED` promises stay in
+  the re-verification cycle; the MCP `admit_promise` tool validates URLs like
+  the web path already did; the MCP port default moved off `8080` so it can't
+  collide with `PORT`; the API rejects impossible calendar dates and
+  over-long announcements instead of truncating silently.
 - Full rebrand (package identifiers, service names, docs, submission
   materials) and a fresh git history, per the hackathon's project-page rules.
 

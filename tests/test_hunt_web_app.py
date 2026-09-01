@@ -59,3 +59,13 @@ def test_extract_request_still_rejects_a_malformed_announced_date():
             source_url="https://acme.com",
             announced_date="Q4 2024",
         )
+
+
+@pytest.mark.parametrize("impossible", ["2024-02-30", "2024-13-01", "2024-00-10", "2023-02-29"])
+def test_extract_request_rejects_well_formatted_but_impossible_calendar_dates(impossible):
+    with pytest.raises(ValidationError):
+        ExtractRequest(
+            announcement_text="Acme will ship Feature X by Q4 2024.",
+            source_url="https://acme.com",
+            announced_date=impossible,
+        )

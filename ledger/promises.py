@@ -152,8 +152,11 @@ class JsonFileBackend:
             self._dump(docs)
 
     def get(self, promise_id: str) -> dict[str, Any] | None:
-        d = self._load().get(promise_id)
-        return dict(d) if d else None
+        # Reads take the lock too: on Windows, reading the file while another
+        # thread is mid-`tmp.replace()` raises PermissionError (WinError 32).
+        with self._lock:
+            d = self._load().get(promise_id)
+            return dict(d) if d else None
 
     def update(self, promise_id: str, fields: dict[str, Any]) -> None:
         with self._lock:
@@ -164,10 +167,12 @@ class JsonFileBackend:
             self._dump(docs)
 
     def all(self) -> list[dict[str, Any]]:
-        return [dict(d) for d in self._load().values()]
+        with self._lock:
+            return [dict(d) for d in self._load().values()]
 
     def by_status(self, status: str) -> list[dict[str, Any]]:
-        return [dict(d) for d in self._load().values() if d.get("status") == status]
+        with self._lock:
+            return [dict(d) for d in self._load().values() if d.get("status") == status]
 
 
 _default_backend: PromiseBackend | None = None
@@ -298,6 +303,10 @@ def list_promises(backend: PromiseBackend | None = None) -> list[dict[str, Any]]
 def due_for_check(check_date: dt.date | None = None, backend: PromiseBackend | None = None) -> list[dict[str, Any]]:
     """PENDING or still-tracking promises whose deadline has passed.
 
+    DELAYED and PARTIALLY_FULFILLED are "resolved" for the scorecard but are
+    still re-checked every cycle: the missing piece can ship later and flip
+    them to FULFILLED_LATE / FULFILLED. FULFILLED* is genuinely terminal.
+
     UNVERIFIABLE promises are retried while there's still a reasonable chance
     the evidence page comes back, but they stop being re-queued once the
     deadline is more than ABANDON_GRACE_DAYS old - otherwise a permanently
@@ -306,7 +315,12 @@ def due_for_check(check_date: dt.date | None = None, backend: PromiseBackend | N
     from ledger.verifier import ABANDON_GRACE_DAYS
 
     today = check_date or dt.datetime.now(dt.timezone.utc).date()
-    trackable = {PromiseStatus.PENDING.value, PromiseStatus.DELAYED.value, PromiseStatus.UNVERIFIABLE.value}
+    trackable = {
+        PromiseStatus.PENDING.value,
+        PromiseStatus.DELAYED.value,
+        PromiseStatus.PARTIALLY_FULFILLED.value,
+        PromiseStatus.UNVERIFIABLE.value,
+    }
     out = []
     for d in _backend(backend).all():
         status = d.get("status")

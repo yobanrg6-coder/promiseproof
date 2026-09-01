@@ -4,10 +4,11 @@ Starts both the FastMCP Server and the FastAPI Web Studio, and refuses to boot
 a broken configuration silently (missing API key, MCP server that never comes up).
 """
 
+import atexit
 import os
+import signal
 import subprocess  # nosec B404 - only ever launches our own mcp_server/server.py, no shell, no user input
 import sys
-import threading
 import time
 
 import httpx
@@ -35,14 +36,38 @@ def warn_on_missing_config():
         print("   (copy .env.example to .env, key from https://studio.nebius.com/).\n")
 
 
+_mcp_proc: subprocess.Popen | None = None
+
+
 def start_mcp_server():
-    """Runs the FastMCP server in a background thread."""
+    """Launch the FastMCP server as a child process and keep a handle to it.
+
+    Fixed argv (this interpreter + our own script path), no shell, no
+    untrusted input.
+    """
+    global _mcp_proc
     server_path = os.path.join(os.path.dirname(__file__), "mcp_server", "server.py")
-    # Long-running daemon thread wrapping the MCP server process for the
-    # lifetime of the app - its exit code is not meaningful to check here.
-    # Fixed argv (this interpreter + our own script path), no shell, no
-    # untrusted input.
-    subprocess.run([sys.executable, server_path], check=False)  # nosec B603
+    _mcp_proc = subprocess.Popen([sys.executable, server_path])  # nosec B603
+
+
+def _stop_mcp_server(*_args):
+    """Terminate the MCP child so it can't outlive us holding its port.
+
+    Registered with atexit and the INT/TERM handlers: a daemon thread running
+    subprocess.run() would leave the child alive on Ctrl+C, especially on
+    Windows where there is no process-group signal to inherit.
+    """
+    global _mcp_proc
+    proc, _mcp_proc = _mcp_proc, None
+    if proc and proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
+atexit.register(_stop_mcp_server)
 
 
 def wait_for_mcp_server(mcp_url: str, timeout_seconds: int = MCP_READY_TIMEOUT_SECONDS) -> bool:
@@ -71,16 +96,22 @@ def main():
 
     warn_on_missing_config()
 
-    # 8080 matches mcp_server/server.py's own MCP_SERVER_PORT default for local
-    # dev. Docker/Cloud Run always sets MCP_SERVER_URL explicitly to 8081 (see
-    # Dockerfile) to avoid colliding with the web app on the single exposed
-    # port, so this fallback is only ever reached in local runs.
-    mcp_url = os.getenv("MCP_SERVER_URL", "http://127.0.0.1:8080/mcp")
+    # 8081, matching mcp_server/server.py's own MCP_SERVER_PORT default and the
+    # Dockerfile. Deliberately NOT 8080: that is the conventional value of the
+    # PORT env var (Cloud Run, many PaaS, local `.env`s), which run.py uses for
+    # the web app below - sharing it makes the two servers fight for the socket.
+    mcp_url = os.getenv("MCP_SERVER_URL", "http://127.0.0.1:8081/mcp")
 
-    # 1. Start FastMCP Server in background thread
+    # Terminate the MCP child on Ctrl+C / SIGTERM as well as normal exit.
+    for _sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            signal.signal(_sig, lambda *_a: sys.exit(0))
+        except (ValueError, OSError):
+            pass  # not on the main thread, or signal unavailable on this OS
+
+    # 1. Start FastMCP Server as a child process
     print(f"[1/2] Launching FastMCP Server on {mcp_url} ...")
-    mcp_thread = threading.Thread(target=start_mcp_server, daemon=True)
-    mcp_thread.start()
+    start_mcp_server()
 
     if wait_for_mcp_server(mcp_url):
         print("   FastMCP Server is up.")

@@ -28,7 +28,7 @@ from ledger import promises as ledger
 from ledger.verifier import verify_promise
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-logger = logging.getLogger("promise_ledger.cycle")
+logger = logging.getLogger("promiseproof.cycle")
 
 
 def _verify_rows(rows: list[dict], today: dt.date, backend) -> dict:

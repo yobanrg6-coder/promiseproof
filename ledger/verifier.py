@@ -48,15 +48,18 @@ _MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July",
 _MONTHS = {m.lower(): i for i, m in enumerate(_MONTH_NAMES, start=1)}
 # Accept the standard 3-letter abbreviations too ("Oct", "sep", ...).
 _MONTHS.update({m[:3].lower(): i for i, m in enumerate(_MONTH_NAMES, start=1)})
+# "Sept" is a common 4-letter abbreviation the 3-letter slice misses.
+_MONTHS["sept"] = 9
 
 # re.IGNORECASE on the month patterns so "oct 28, 2024" / "OCTOBER 28, 2024"
 # are read as well as Titlecase; the _MONTHS lookup still gates what counts.
 # The `(?:st|nd|rd|th)?` makes the day ordinal optional, so "4th November 2024"
-# / "November 4th, 2024" is read as well as "4 November 2024".
+# / "November 4th, 2024" is read as well as "4 November 2024". The comma after
+# the day is optional so "October 28 2024" reads the same as "October 28, 2024".
 _DATE_PATTERNS = [
     re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b"),
     re.compile(r"\b(\d{4})/(\d{2})/(\d{2})\b"),
-    re.compile(r"\b([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?,\s+(\d{4})\b", re.IGNORECASE),
+    re.compile(r"\b([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b", re.IGNORECASE),
     re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\s+(\d{4})\b", re.IGNORECASE),
 ]
 

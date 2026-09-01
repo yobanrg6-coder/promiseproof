@@ -26,6 +26,7 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from agents.falsifiability_gate import run_gate
 from agents.promise_schemas import PromiseExtraction
 from ledger import promises as ledger
+from ledger.evidence import looks_like_safe_url
 from ledger.run_cycle import run_cycle
 
 load_dotenv()
@@ -77,6 +78,13 @@ def admit_promise(
     observable outcome); if it doesn't, nothing is written and the gate's
     reason is returned. On success the ledger stores it as PENDING until a
     verification cycle resolves it."""
+    # The web pipeline validates source_url via Pydantic; do the same here so
+    # an MCP client can't persist a javascript:/file: scheme or an
+    # href-breakout string into a ledger row that later renders as a link.
+    for _field, _value in (("source_url", source_url), ("evidence_url", evidence_url)):
+        if not looks_like_safe_url(_value):
+            return {"error": f"{_field} must be an http(s) URL with no quote/space/angle characters"}
+
     extraction = PromiseExtraction(
         is_falsifiable=True,
         company=company,
@@ -122,6 +130,7 @@ def run_verification_cycle() -> dict:
 
 if __name__ == "__main__":
     host = os.getenv("MCP_SERVER_HOST", "127.0.0.1")
-    port = int(os.getenv("MCP_SERVER_PORT", "8080"))
+    # 8081, not 8080: 8080 is the conventional PORT value the web app takes.
+    port = int(os.getenv("MCP_SERVER_PORT", "8081"))
     print(f"Starting PromiseProof FastMCP server on http://{host}:{port}/mcp ...")
     mcp.run(transport="streamable-http", host=host, port=port)

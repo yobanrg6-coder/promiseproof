@@ -311,6 +311,31 @@ def test_due_for_check_stops_retrying_stale_unverifiable():
     assert promises.due_for_check(check_date=dt.date(2026, 8, 27), backend=be) == []
 
 
+def test_due_for_check_keeps_rechecking_partially_fulfilled():
+    """A PARTIALLY_FULFILLED promise past its deadline stays in the cycle: the
+    missing half can ship later and flip it to FULFILLED_LATE (BUG-08)."""
+    be = InMemoryBackend()
+    pid = promises.admit_promise(
+        company="Acme", promise_text="ship X and Y", source_quote="q",
+        source_url="https://example.com", announced_date="2024-01-01",
+        deadline_raw="Q2 2024", deadline_date="2024-06-30",
+        observable_outcome="X and Y both on the dashboard",
+        check_keywords=["Feature X", "Feature Y"], backend=be,
+    )
+    promises.apply_verification(
+        pid, VerificationResult(status=PromiseStatus.PARTIALLY_FULFILLED, reason="only X so far"),
+        backend=be,
+    )
+    due = promises.due_for_check(check_date=dt.date(2025, 1, 1), backend=be)
+    assert [d["id"] for d in due] == [pid]
+
+    # FULFILLED, by contrast, is terminal and must NOT be re-queued.
+    promises.apply_verification(
+        pid, VerificationResult(status=PromiseStatus.FULFILLED, reason="both shipped"), backend=be,
+    )
+    assert promises.due_for_check(check_date=dt.date(2025, 1, 1), backend=be) == []
+
+
 # =========================================================================== #
 # 5. Pydantic round-trip integrity
 # =========================================================================== #
