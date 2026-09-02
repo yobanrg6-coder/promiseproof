@@ -135,8 +135,12 @@ def fetch_evidence(url: str, timeout: float = 25.0) -> Evidence:
         # one GET; a blind timing probe via a redirect the attacker also
         # controls is not fully prevented - the direct case, evidence_url
         # pointing straight at an internal address, is, by the check above.)
-        r = httpx.get(url, follow_redirects=True, timeout=timeout,
-                      headers={"User-Agent": _UA}, max_redirects=3)
+        # max_redirects is a client-level setting, not a param of httpx.get() -
+        # passing it to the top-level helper raises TypeError and fails every
+        # fetch, so build a Client explicitly.
+        with httpx.Client(follow_redirects=True, timeout=timeout,
+                          headers={"User-Agent": _UA}, max_redirects=3) as client:
+            r = client.get(url)
     except Exception as e:  # noqa: BLE001 - any transport error is just "couldn't fetch"
         return Evidence(url=url, ok=False, error=f"{type(e).__name__}: {e}")
 

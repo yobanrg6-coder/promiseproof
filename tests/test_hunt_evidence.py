@@ -3,8 +3,10 @@ Adversarial tests for ledger.evidence - hunting text extraction, SPA thresholds,
 No network, no LLM calls.
 """
 
+import httpx
 import pytest
 
+from ledger import evidence as evidence_mod
 from ledger.evidence import (
     _SHELL_TEXT_THRESHOLD,
     Evidence,
@@ -115,6 +117,56 @@ def test_fetch_evidence_empty_url():
     ev = fetch_evidence("")
     assert not ev.ok
     assert ev.error == "no evidence url"
+
+
+def test_fetch_evidence_issues_a_real_httpx_request_without_raising(monkeypatch):
+    """Regression guard: every other test monkeypatches fetch_evidence away, so
+    the real network call path is never exercised. `max_redirects` is a Client
+    setting, not a param of `httpx.get()` - passing it to the top-level helper
+    raised TypeError and turned every verification into UNVERIFIABLE."""
+    monkeypatch.setattr(evidence_mod, "is_public_http_url", lambda _u: True)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["user-agent"].startswith("Mozilla/5.0 (compatible; PromiseProofBot")
+        return httpx.Response(
+            200,
+            html="<html><body><p>Feature X shipped in the Acme Dashboard "
+                 "on October 28, 2024.</p></body></html>",
+        )
+
+    real_client = httpx.Client
+
+    def fake_client(*args, **kwargs):
+        kwargs["transport"] = httpx.MockTransport(handler)
+        return real_client(*args, **kwargs)
+
+    monkeypatch.setattr(evidence_mod.httpx, "Client", fake_client)
+
+    ev = fetch_evidence("https://acme.example/docs")
+    assert ev.ok
+    assert "Feature X shipped in the Acme Dashboard" in ev.text
+    assert ev.error == ""
+
+
+def test_fetch_evidence_caps_redirects_via_the_client(monkeypatch):
+    """A redirect loop must surface as a clean ok=False Evidence (httpx raises
+    TooManyRedirects once the Client's max_redirects is exceeded), not blow up."""
+    monkeypatch.setattr(evidence_mod, "is_public_http_url", lambda _u: True)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(302, headers={"location": "https://acme.example/next"})
+
+    real_client = httpx.Client
+
+    def fake_client(*args, **kwargs):
+        kwargs["transport"] = httpx.MockTransport(handler)
+        return real_client(*args, **kwargs)
+
+    monkeypatch.setattr(evidence_mod.httpx, "Client", fake_client)
+
+    ev = fetch_evidence("https://acme.example/start")
+    assert not ev.ok
+    assert "Redirect" in ev.error or "redirect" in ev.error
 
 
 # =========================================================================== #
