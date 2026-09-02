@@ -86,15 +86,17 @@ def test_seed_runs_end_to_end_with_fake_evidence(monkeypatch, tmp_path):
     assert card["total"] == len(SEED_PROMISES)
 
 
-def test_reverify_all_rechecks_every_promise_even_when_none_are_due(monkeypatch, tmp_path):
-    """reverify_all re-runs the zero-LLM verifier over the WHOLE ledger; run_cycle
-    only touches promises still in a trackable state. After seeding with an empty
-    page every promise resolves ABANDONED, so run_cycle has nothing to do but
-    reverify_all still re-checks all of them."""
+def test_reverify_all_covers_the_whole_ledger_run_cycle_only_a_subset(monkeypatch, tmp_path):
+    """reverify_all re-runs the zero-LLM verifier over the WHOLE ledger;
+    run_cycle only touches promises still in a trackable state whose deadline
+    has passed - so it skips the terminal (ABANDONED) rows and the
+    forward-dated rows whose deadline is still in the future."""
     be = JsonFileBackend(tmp_path / "ledger.json")
     monkeypatch.setattr(verifier, "fetch_evidence", _fake_evidence("nothing relevant on this page"))
     seed(fresh=True, verify=True, backend=be)
     check = dt.date(2026, 8, 28)
 
-    assert run_cycle(check_date=check, backend=be)["checked"] == 0
-    assert reverify_all(check_date=check, backend=be)["checked"] == len(SEED_PROMISES)
+    cycle_checked = run_cycle(check_date=check, backend=be)["checked"]
+    full_checked = reverify_all(check_date=check, backend=be)["checked"]
+    assert full_checked == len(SEED_PROMISES)
+    assert cycle_checked < full_checked

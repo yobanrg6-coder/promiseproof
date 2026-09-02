@@ -268,4 +268,76 @@ SEED_PROMISES: list[dict] = [
         "evidence_url": "https://en.wikipedia.org/wiki/Gemini_(chatbot)",
         "claimed_outcome": "FULFILLED - Gemini Advanced (with Gemini Ultra 1.0) launched 2024-02-08.",
     },
+    # ------------------------------------------------------------------ #
+    #  Forward-dated batch - 2026-09-01. Every quote transcribed from the  #
+    #  Google I/O 2026 primary-source blog posts (pub 2026-05-19/20).     #
+    #  Deadlines land during and after the Dec 2026 judging window, so     #
+    #  the scorecard MOVES on its own while judges watch: two already      #
+    #  resolvable, one flips mid-judging, one stays PENDING with a         #
+    #  receipt-in-waiting. The zero-LLM verifier decides each, as always.  #
+    # ------------------------------------------------------------------ #
+    {
+        "company": "Google",
+        "announced_date": "2026-05-20",
+        "source_url": "https://blog.google/innovation-and-ai/technology/ai/google-io-2026-all-our-announcements/",
+        "source_quote": (
+            "We're also hard at work on Gemini 3.5 Pro. It's already being used internally "
+            "and we look forward to rolling it out next month."
+        ),
+        "promise_text": "Google will release Gemini 3.5 Pro within about a month of I/O 2026 (May 2026).",
+        "observable_outcome": "Google's model documentation lists Gemini 3.5 Pro as a released, generally available model.",
+        "check_keywords": ["Gemini 3.5 Pro", "3.5 Pro"],
+        "deadline_raw": "next month",
+        "deadline_date_iso": "2026-06-30",
+        "evidence_url": "https://en.wikipedia.org/wiki/Gemini_(language_model)",
+        "claimed_outcome": "Deadline already passed at seed time - the verifier decides FULFILLED / FULFILLED_LATE / DELAYED from the live page.",
+    },
+    {
+        "company": "Google",
+        "announced_date": "2026-05-20",
+        "source_url": "https://blog.google/innovation-and-ai/technology/ai/google-io-2026-all-our-announcements/",
+        "source_quote": (
+            "This feature is rolling out in the Gemini app starting today, and it will come "
+            "to Search and Chrome in the coming months."
+        ),
+        "promise_text": "Google will bring C2PA Content Credentials verification to Search and Chrome within months of May 2026.",
+        "observable_outcome": "Google documents C2PA Content Credentials / SynthID verification available in Chrome.",
+        "check_keywords": ["Content Credentials", "C2PA", "Chrome"],
+        "deadline_raw": "in the coming months",
+        "deadline_date_iso": "2026-08-31",
+        "evidence_url": "https://en.wikipedia.org/wiki/Content_Credentials",
+        "claimed_outcome": "Deadline passed at seed time - verifier decides from the live page.",
+    },
+    {
+        "company": "Google",
+        "announced_date": "2026-05-20",
+        "source_url": "https://blog.google/innovation-and-ai/technology/ai/google-io-2026-all-our-announcements/",
+        "source_quote": (
+            "Our first audio glasses, made in partnership with Gentle Monster, Warby Parker, "
+            "and Samsung, will arrive this fall."
+        ),
+        "promise_text": "Google will ship its first Android XR audio glasses (with Gentle Monster / Warby Parker / Samsung) in fall 2026.",
+        "observable_outcome": "Google or a named partner announces the Android XR audio glasses shipping / available to buy.",
+        "check_keywords": ["Android XR", "audio glasses", "Gentle Monster", "Warby Parker"],
+        "deadline_raw": "this fall",
+        "deadline_date_iso": "2026-11-30",
+        "evidence_url": "https://en.wikipedia.org/wiki/Android_XR",
+        "claimed_outcome": "PENDING at seed time; deadline 2026-11-30 falls right before judging - expected to resolve mid-judging.",
+    },
+    {
+        "company": "Google",
+        "announced_date": "2026-05-19",
+        "source_url": "https://blog.google/innovation-and-ai/sundar-pichai-io-2026/",
+        "source_quote": (
+            "On Android, you will be able to view live updates and task progress of agents "
+            "like Spark through a new UI space called Android Halo, coming later this year."
+        ),
+        "promise_text": "Google will ship Android Halo, an on-device UI for tracking agent task progress, before the end of 2026.",
+        "observable_outcome": "Android's release notes / Google's Android site document Android Halo as a shipped feature.",
+        "check_keywords": ["Android Halo", "Halo"],
+        "deadline_raw": "later this year",
+        "deadline_date_iso": "2026-12-31",
+        "evidence_url": "https://en.wikipedia.org/wiki/Android_version_history",
+        "claimed_outcome": "PENDING at seed time; deadline 2026-12-31 - stays PENDING through the judging window and resolves at its close.",
+    },
 ]

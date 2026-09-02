@@ -7,38 +7,32 @@ log). No Firestore, no Cloud Run, no card.
 
 ## 1. The web app on Hugging Face Spaces
 
+The GitHub Action `.github/workflows/sync-to-hf-space.yml` pushes `master` to
+the Space on every commit and injects the HF README frontmatter in CI (so the
+GitHub README stays clean). You only do the one-time setup:
+
 1. https://huggingface.co/new-space → **SDK: Docker**, blank template,
-   visibility **Public**.
-2. In the Space, **Settings → Variables and secrets**:
-   - Secret `NEBIUS_API_KEY` = the (rotated) Nebius Token Factory key. Only the
-     live "test the pipeline" demo needs it; the scorecard, the chain and the
-     MCP tools work without it.
-   - Variable `WEB_APP_PORT` = `7860` (HF serves Docker Spaces on 7860).
-3. Point the Space at this repo's code. Either:
-   - **Push the repo to the Space's git remote** (`git remote add space
-     https://huggingface.co/spaces/<you>/promiseproof` then `git push space
-     master:main`), **or**
-   - add the "Sync to Hugging Face" GitHub Action with an `HF_TOKEN` repo
-     secret (HF's own template).
-4. The Space's `README.md` needs this frontmatter at the very top (HF reads it;
-   it's harmless on GitHub):
-
-   ```yaml
-   ---
-   title: PromiseProof
-   emoji: 📜
-   colorFrom: green
-   colorTo: gray
-   sdk: docker
-   app_port: 7860
-   pinned: false
-   ---
+   visibility **Public**. Name it e.g. `promiseproof`.
+2. In **this GitHub repo → Settings → Secrets and variables → Actions**:
+   - **Secret** `HF_TOKEN` = a Hugging Face **write** token
+     (https://huggingface.co/settings/tokens).
+   - **Variable** `HF_SPACE` = `<your-hf-username>/promiseproof`.
+   Or from the CLI:
    ```
+   gh secret set HF_TOKEN --body "hf_xxx"
+   gh variable set HF_SPACE --body "<you>/promiseproof"
+   ```
+3. In the **Space → Settings → Variables and secrets**:
+   - **Secret** `NEBIUS_API_KEY` = the (rotated) Nebius Token Factory key. Only
+     the live "test the pipeline" demo needs it; the scorecard, the chain and
+     the MCP tools work without it.
+4. Kick the first sync: `gh workflow run "sync to Hugging Face Space"` (or just
+   push any commit). The Space builds the existing `Dockerfile`.
 
-The existing `Dockerfile` already does the right thing: `run.py` binds the web
-app to `0.0.0.0:$WEB_APP_PORT` (7860 here) and starts the MCP server on an
-internal port. `LEDGER_BACKEND` defaults to `json`, so it serves the committed
-`data/ledger.json` baseline.
+The `Dockerfile` binds the web app to `:8080` (`WEB_APP_PORT`/`PORT`), which is
+why the injected frontmatter says `app_port: 8080` - no Space variable needed.
+`LEDGER_BACKEND` defaults to `json`, so it serves the committed
+`data/ledger.json` baseline; the MCP server runs on an internal port.
 
 > HF Spaces' disk is ephemeral and the Space sleeps when idle. That's fine:
 > writes there don't need to survive (the committed ledger is the source of

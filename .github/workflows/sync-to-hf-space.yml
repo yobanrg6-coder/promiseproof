@@ -1,0 +1,58 @@
+name: sync to Hugging Face Space
+
+# Mirrors master to a Hugging Face Space on every push, so the live demo tracks
+# the repo with no manual step. Prepends the HF Space README frontmatter in CI
+# only (never committed to master, so GitHub's README stays clean).
+#
+# One-time setup:
+#   1. Create a Docker Space:  https://huggingface.co/new-space  (SDK: Docker)
+#   2. Repo secret   HF_TOKEN   = a Hugging Face write token (hf.co/settings/tokens)
+#   3. Repo variable HF_SPACE   = "<your-hf-username>/<space-name>"
+#   4. Space secret  NEBIUS_API_KEY = the Nebius key (only the live pipeline demo needs it)
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+concurrency:
+  group: sync-hf
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          test -n "$HF_TOKEN" || { echo "::error::set the HF_TOKEN repo secret"; exit 1; }
+          test -n "$HF_SPACE" || { echo "::error::set the HF_SPACE repo variable (user/space)"; exit 1; }
+
+          # HF Spaces read a YAML frontmatter block from README.md. Add it in CI
+          # only; the Dockerfile already binds the web app to :8080.
+          {
+            echo '---'
+            echo 'title: PromiseProof'
+            echo 'emoji: "\U0001F4DC"'
+            echo 'colorFrom: green'
+            echo 'colorTo: gray'
+            echo 'sdk: docker'
+            echo 'app_port: 8080'
+            echo 'pinned: false'
+            echo '---'
+            echo
+            cat README.md
+          } > README.hf.md
+          mv README.hf.md README.md
+
+          git config user.email "hf-sync@users.noreply.github.com"
+          git config user.name  "hf-sync[bot]"
+          git commit -aqm "ci: HF Space frontmatter"
+          git push --force "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" HEAD:main
