@@ -283,7 +283,7 @@ def test_archive_capture_on_or_before_deadline_with_keywords_is_fulfilled_on_tim
     """The strong path: the official page, as archived on/before the deadline,
     already carries the check keywords -> FULFILLED on time, and the capture
     date is the dated proof (no prose-date parsing needed)."""
-    monkeypatch.setattr(verifier, "snapshot_near", _snap("2024-06-30"))
+    monkeypatch.setattr(verifier, "snapshot_at_or_before", _snap("2024-06-30"))
     monkeypatch.setattr(verifier, "fetch_evidence", _fake_evidence_by_url(
         {"web.archive.org": "Feature X is live in the Acme Dashboard.",
          "acme.com/docs": "unrelated current content"}))
@@ -299,7 +299,7 @@ def test_archive_capture_on_or_before_deadline_with_keywords_is_fulfilled_on_tim
 def test_archive_absent_at_deadline_but_present_now_is_fulfilled_late(monkeypatch):
     """The archived page from on/before the deadline does NOT have the
     keywords, but the live page does -> it shipped, but late."""
-    monkeypatch.setattr(verifier, "snapshot_near", _snap("2024-06-15"))
+    monkeypatch.setattr(verifier, "snapshot_at_or_before", _snap("2024-06-15"))
     monkeypatch.setattr(verifier, "fetch_evidence", _fake_evidence_by_url(
         {"web.archive.org": "Nothing has shipped yet. Coming soon.",
          "acme.com/docs": "Feature X is now live in the Acme Dashboard."}))
@@ -314,15 +314,10 @@ def test_archive_absent_at_deadline_but_present_now_is_fulfilled_late(monkeypatc
 def test_bot_blocked_live_page_is_verified_via_a_recent_archive_capture(monkeypatch):
     """The live page 403s to non-browser clients; a recent Wayback capture
     still lets the verifier resolve it instead of giving up as UNVERIFIABLE."""
-    calls = {"n": 0}
-
-    def snap(url, target, **k):
-        # no capture near the deadline, but one near 'today'
-        calls["n"] += 1
-        return None if calls["n"] == 1 else ArchiveSnapshot(
-            "https://acme.com/docs", "http://web.archive.org/web/2026/acme", dt.date(2026, 8, 1))
-
-    monkeypatch.setattr(verifier, "snapshot_near", snap)
+    # no capture on/before the deadline (probe 1), but one near 'today' (probe 2)
+    monkeypatch.setattr(verifier, "snapshot_at_or_before", lambda *a, **k: None)
+    monkeypatch.setattr(verifier, "snapshot_near", lambda *a, **k: ArchiveSnapshot(
+        "https://acme.com/docs", "http://web.archive.org/web/2026/acme", dt.date(2026, 8, 1)))
     monkeypatch.setattr(verifier, "fetch_evidence", _fake_evidence_by_url(
         {"web.archive.org": "Feature X shipped in the Acme Dashboard.",
          "acme.com/docs": ""}))  # live fetch returns empty/not-ok
@@ -334,12 +329,13 @@ def test_bot_blocked_live_page_is_verified_via_a_recent_archive_capture(monkeypa
 
 
 def test_archive_snapshot_after_the_deadline_is_not_treated_as_on_time_proof(monkeypatch):
-    """snapshot_near returns the closest capture in either direction; one from
-    AFTER the deadline must not be used to claim on-time delivery."""
-    monkeypatch.setattr(verifier, "snapshot_near", _snap("2025-03-01"))  # long after deadline
+    """When the only captures are AFTER the deadline, snapshot_at_or_before
+    returns nothing, so probe 1 contributes no on-time proof - the verdict
+    falls to the live page (FULFILLED undated, not FULFILLED on time)."""
+    monkeypatch.setattr(verifier, "snapshot_at_or_before", lambda *a, **k: None)
+    monkeypatch.setattr(verifier, "snapshot_near", lambda *a, **k: None)
     monkeypatch.setattr(verifier, "fetch_evidence", _fake_evidence_by_url(
-        {"web.archive.org": "Feature X and Acme Dashboard are live.",
-         "acme.com/docs": "Feature X and Acme Dashboard are live now."}))
+        {"acme.com/docs": "Feature X and Acme Dashboard are live now."}))
 
     p = _make_promise(announced_date="2024-02-01", deadline_date="2024-06-30")
     r = verify_promise(p, check_date=dt.date(2026, 8, 27))
@@ -347,3 +343,36 @@ def test_archive_snapshot_after_the_deadline_is_not_treated_as_on_time_proof(mon
     assert r.status == PromiseStatus.FULFILLED
     assert r.ship_date_confirmed is False
     assert r.verification_method == "live-page"
+
+
+class _CdxResp:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return [["timestamp", "original"], *self._rows]
+
+
+def test_snapshot_at_or_before_returns_the_newest_capture_on_or_before_the_deadline(monkeypatch):
+    from ledger import archive
+
+    monkeypatch.setattr(archive.httpx, "get", lambda *a, **k: _CdxResp([
+        ["20240601010101", "https://acme.com/docs"],
+        ["20240628123456", "https://acme.com/docs"],  # newest, still <= 2024-06-30
+    ]))
+    snap = archive.snapshot_at_or_before("https://acme.com/docs", dt.date(2024, 6, 30))
+    assert snap is not None and snap.ok
+    assert snap.captured == dt.date(2024, 6, 28)
+    assert "20240628123456" in snap.archive_url
+
+
+def test_snapshot_at_or_before_never_returns_a_capture_after_the_deadline(monkeypatch):
+    from ledger import archive
+
+    monkeypatch.setattr(archive.httpx, "get", lambda *a, **k: _CdxResp([
+        ["20240715000000", "https://acme.com/docs"],  # after the deadline
+    ]))
+    assert archive.snapshot_at_or_before("https://acme.com/docs", dt.date(2024, 6, 30)) is None

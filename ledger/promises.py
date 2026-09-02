@@ -18,6 +18,7 @@ env var (see get_backend):
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import os
 import re
@@ -63,6 +64,61 @@ def _norm_key_text(s: str) -> str:
     announcement that differ only in quote style or spacing must collide."""
     s = unicodedata.normalize("NFKC", s or "").translate(_QUOTE_FOLD)
     return re.sub(r"\s+", " ", s).strip().casefold()
+
+
+# --------------------------------------------------------------------------- #
+# Append-only hash chain
+#
+# The chain covers only the IMMUTABLE claim a promise makes - the verbatim
+# quote, who made it, the deadline, and what public thing counts as delivery.
+# It deliberately does NOT cover status / verification fields: those change
+# every cycle by design, and anyone can recompute a verdict from the same
+# public evidence. What the chain makes tamper-evident is the claim itself -
+# a company can't later say "we never worded it that way" or nudge a deadline,
+# because that would break entry_hash for its row and every row admitted after.
+# --------------------------------------------------------------------------- #
+GENESIS_HASH = "0" * 64
+_CHAIN_FIELDS = (
+    "id", "company", "promise_text", "source_quote", "source_url",
+    "announced_date", "deadline_raw", "deadline_date", "observable_outcome",
+    "check_keywords", "evidence_url", "created_at",
+)
+
+
+def _entry_hash(doc: dict[str, Any], prev_hash: str, seq: int) -> str:
+    """sha256 over (prev_hash + seq + canonical JSON of the claim fields)."""
+    core = {k: doc.get(k) for k in _CHAIN_FIELDS}
+    payload = json.dumps(core, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(f"{prev_hash}|{seq}|{payload}".encode()).hexdigest()
+
+
+def _chain_tip(rows: list[dict[str, Any]]) -> tuple[int, str]:
+    """(next seq, prev_hash) for a new entry appended after `rows`."""
+    if not rows:
+        return 0, GENESIS_HASH
+    tip = max(rows, key=lambda r: r.get("seq", 0))
+    return int(tip.get("seq", 0)) + 1, tip.get("entry_hash") or GENESIS_HASH
+
+
+def verify_chain(backend: PromiseBackend | None = None) -> dict[str, Any]:
+    """Recompute every link from GENESIS. Returns {length, intact, broken[],
+    head}. `broken` lists the first mismatch per row, so a single edited quote
+    shows up as one entry plus the "prev_hash mismatch" of the row after it."""
+    rows = sorted(_backend(backend).all(), key=lambda r: r.get("seq", 0))
+    prev = GENESIS_HASH
+    broken: list[dict[str, Any]] = []
+    for i, r in enumerate(rows):
+        want = _entry_hash(r, prev, r.get("seq", i))
+        if r.get("prev_hash") != prev:
+            broken.append({"seq": r.get("seq", i), "id": r.get("id"), "issue": "prev_hash mismatch"})
+        elif r.get("entry_hash") != want:
+            broken.append({"seq": r.get("seq", i), "id": r.get("id"), "issue": "entry_hash mismatch",
+                           "expected": want, "stored": r.get("entry_hash", "")})
+        # Continue from the RECOMPUTED hash, not the stored one: a single edited
+        # claim then breaks its own row and every row after it, so tampering
+        # can't be localized to one line.
+        prev = want
+    return {"length": len(rows), "intact": not broken, "broken": broken, "head": prev}
 
 
 class PromiseBackend(Protocol):
@@ -258,8 +314,9 @@ def admit_promise(
     # that renders the same sentence with curly quotes on one run and straight
     # quotes on the next still collides.
     be = _backend(backend)
+    rows = list(be.all())
     key = (_norm_key_text(company), deadline_date.strip(), _norm_key_text(source_quote))
-    for existing in be.all():
+    for existing in rows:
         if (
             _norm_key_text(existing.get("company", "")),
             existing.get("deadline_date", "").strip(),
@@ -267,6 +324,7 @@ def admit_promise(
         ) == key:
             return existing["id"]
 
+    seq, prev_hash = _chain_tip(rows)
     promise = LedgerPromise(
         id=str(uuid.uuid4()),
         company=company,
@@ -283,8 +341,14 @@ def admit_promise(
         created_at=utcnow_iso(),
         extractor_model=extractor_model,
         auditor_agreed=auditor_agreed,
+        seq=seq,
+        prev_hash=prev_hash,
     )
-    be.insert(promise.model_dump(mode="json"))
+    doc = promise.model_dump(mode="json")
+    # entry_hash is computed over the frozen document, then written back onto it
+    # (it is not itself one of the _CHAIN_FIELDS, so this is not circular).
+    doc["entry_hash"] = _entry_hash(doc, prev_hash, seq)
+    be.insert(doc)
     return promise.id
 
 

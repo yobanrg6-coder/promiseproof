@@ -1,0 +1,5 @@
+# Minimal deps for the zero-LLM re-verification cycle (ledger/run_cycle.py).
+# No google-adk / litellm / fastmcp / fastapi: the cycle never touches an LLM,
+# so the scheduled GitHub Action installs only this and runs in seconds.
+pydantic==2.13.4
+httpx==0.28.1

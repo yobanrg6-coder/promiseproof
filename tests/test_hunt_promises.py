@@ -382,3 +382,73 @@ def test_ledger_promise_pydantic_round_trip():
     model = LedgerPromise(**row)
     assert isinstance(model.status, PromiseStatus)
     assert model.status == PromiseStatus.PENDING
+
+
+# =========================================================================== #
+# 6. Append-only hash chain over the immutable claim
+# =========================================================================== #
+def _admit(be, **over):
+    kw = {
+        "company": "Acme", "promise_text": "ship X",
+        "source_quote": "We will ship X by Q2 2024.",
+        "source_url": "https://example.com", "announced_date": "2024-01-01",
+        "deadline_raw": "Q2 2024", "deadline_date": "2024-06-30",
+        "observable_outcome": "Feature X on the dashboard",
+        "check_keywords": ["Feature X", "Acme Console"], "backend": be,
+    }
+    kw.update(over)
+    return promises.admit_promise(**kw)
+
+
+def test_chain_links_each_admission_to_the_previous_one():
+    be = InMemoryBackend()
+    id0 = _admit(be, source_quote="First promise, ship A by Q2 2024.")
+    id1 = _admit(be, source_quote="Second promise, ship B by Q3 2024.", deadline_date="2024-09-30")
+
+    r0 = promises.get_promise(id0, backend=be)
+    r1 = promises.get_promise(id1, backend=be)
+    assert r0["seq"] == 0 and r0["prev_hash"] == promises.GENESIS_HASH
+    assert r1["seq"] == 1 and r1["prev_hash"] == r0["entry_hash"]
+    assert r0["entry_hash"] and r1["entry_hash"] and r0["entry_hash"] != r1["entry_hash"]
+
+    chain = promises.verify_chain(backend=be)
+    assert chain["intact"] is True
+    assert chain["length"] == 2
+    assert chain["broken"] == []
+    assert chain["head"] == r1["entry_hash"]
+
+
+def test_chain_detects_an_edited_quote_after_the_fact():
+    """Editing a stored source_quote must break that row's entry_hash AND show
+    up as a prev_hash mismatch on every row admitted after it."""
+    be = InMemoryBackend()
+    _admit(be, source_quote="Original wording: ship A by Q2 2024.")
+    id1 = _admit(be, source_quote="ship B by Q3 2024.", deadline_date="2024-09-30")
+    _admit(be, source_quote="ship C by Q4 2024.", deadline_date="2024-12-31")
+    assert promises.verify_chain(backend=be)["intact"] is True
+
+    # tamper: someone rewrites the second promise's quote in storage
+    be._docs[id1]["source_quote"] = "ship B by Q3 2024, but only maybe."
+
+    chain = promises.verify_chain(backend=be)
+    assert chain["intact"] is False
+    seqs = {b["seq"] for b in chain["broken"]}
+    assert 1 in seqs  # the edited row's own hash no longer matches
+    assert 2 in seqs  # and the row after it no longer chains to a valid prev
+
+
+def test_chain_survives_a_verification_status_update():
+    """apply_verification changes status/verdict fields, which are deliberately
+    NOT part of the chain - the chain must stay intact across a cycle."""
+    be = InMemoryBackend()
+    pid = _admit(be)
+    promises.apply_verification(
+        pid, VerificationResult(status=PromiseStatus.FULFILLED, reason="shipped"), backend=be
+    )
+    assert promises.get_promise(pid, backend=be)["status"] == "FULFILLED"
+    assert promises.verify_chain(backend=be)["intact"] is True
+
+
+def test_empty_ledger_chain_is_trivially_intact():
+    chain = promises.verify_chain(backend=InMemoryBackend())
+    assert chain == {"length": 0, "intact": True, "broken": [], "head": promises.GENESIS_HASH}

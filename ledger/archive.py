@@ -11,8 +11,13 @@ it was captured near D*. The capture timestamp itself is then the dated
 evidence - "the official page said X on 2024-06-30" - with no prose-date
 parsing and no third party to trust beyond a neutral public archive.
 
-Uses only the availability API (`archive.org/wayback/available`), which is
-fast and reliable; it returns the single closest capture to a timestamp.
+Two lookups, both LLM-free:
+  - `snapshot_at_or_before(url, D)` uses the CDX API to get the LAST capture
+    on or before D. This is what "did it ship by the deadline" actually needs:
+    the availability API returns the nearest capture in *either* direction, so
+    a capture a week after D would hide a perfectly good one a week before it.
+  - `snapshot_near(url, D)` uses the fast availability API for the nearest
+    capture in either direction - used for "the page roughly now".
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ from dataclasses import dataclass
 import httpx
 
 _AVAILABILITY = "https://archive.org/wayback/available"
+_CDX = "https://web.archive.org/cdx/search/cdx"
 _UA = "Mozilla/5.0 (compatible; PromiseProofBot/1.0; +https://github.com/yobanrg6-coder/promiseproof)"
 
 
@@ -73,3 +79,49 @@ def snapshot_near(url: str, target: dt.date, timeout: float = 12.0) -> ArchiveSn
     if captured is None:
         return None
     return ArchiveSnapshot(original_url=url, archive_url=closest["url"], captured=captured)
+
+
+def snapshot_at_or_before(url: str, deadline: dt.date, timeout: float = 15.0) -> ArchiveSnapshot | None:
+    """The LAST successful capture of `url` on or before `deadline` (CDX API).
+
+    This is the honest answer to "was the page showing X by the deadline?": it
+    never returns a capture from after `deadline`, and among the ones before it
+    picks the most recent - the strongest pre-deadline evidence available.
+    Returns None if the archive has no 200 capture at/before `deadline`.
+    """
+    if not url:
+        return None
+    query_url = url if url.startswith(("http://", "https://")) else f"https://{url}"
+    try:
+        r = httpx.get(
+            _CDX,
+            params={
+                "url": query_url,
+                "to": deadline.strftime("%Y%m%d"),
+                "filter": "statuscode:200",
+                "fl": "timestamp,original",
+                "collapse": "digest",
+                "limit": "-5",  # last few before the deadline; we take the newest usable one
+                "output": "json",
+            },
+            headers={"User-Agent": _UA},
+            timeout=timeout,
+            follow_redirects=True,
+        )
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:  # noqa: BLE001 - any failure is just "no snapshot"
+        return ArchiveSnapshot(url, "", dt.date.min, error=f"{type(e).__name__}: {e}")
+
+    # CDX JSON is [header_row, *rows]; with limit=-5 the newest is last.
+    rows = [row for row in data[1:] if len(row) >= 2] if isinstance(data, list) else []
+    for ts, original in reversed(rows):
+        captured = _parse_ts(ts)
+        if captured is None or captured > deadline:
+            continue
+        return ArchiveSnapshot(
+            original_url=url,
+            archive_url=f"https://web.archive.org/web/{ts}/{original}",
+            captured=captured,
+        )
+    return None

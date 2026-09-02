@@ -38,7 +38,7 @@ import datetime as dt
 import re
 
 from agents.promise_schemas import LedgerPromise, PromiseStatus, VerificationResult
-from ledger.archive import snapshot_near
+from ledger.archive import snapshot_at_or_before, snapshot_near
 from ledger.evidence import fetch_evidence, keyword_hits
 
 ABANDON_GRACE_DAYS = 180
@@ -132,8 +132,11 @@ def verify_promise(promise: LedgerPromise, check_date: dt.date | None = None) ->
                        url=url, now_iso=now_iso, method="unverifiable")
 
     # ---- Probe 1: the official page as archived on or before the deadline ----
+    # CDX "last capture <= deadline", not "nearest capture in either direction":
+    # a capture from just after the deadline must never stand in for one from
+    # just before it.
     absent_by_deadline = ""
-    snap = snapshot_near(url, deadline)
+    snap = snapshot_at_or_before(url, deadline)
     if snap and snap.ok and announced <= snap.captured <= deadline:
         ev_d = fetch_evidence(snap.archive_url, timeout=15.0)
         if ev_d.ok and not ev_d.looks_like_spa_shell:

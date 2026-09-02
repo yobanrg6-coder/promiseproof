@@ -72,7 +72,10 @@
     <h1>PromiseProof</h1>
     <div class="sub">A machine-verifiable record of public product promises. Status set by a zero-LLM verifier against official pages.</div>
   </div>
-  <div class="meta" id="healthMeta">loading…</div>
+  <div>
+    <div class="meta" id="healthMeta">loading…</div>
+    <div class="meta" id="chainMeta"></div>
+  </div>
 </header>
 
 <main>
@@ -137,6 +140,20 @@ async function loadHealth(){
     const h = await (await fetch('/api/health')).json();
     $('#healthMeta').textContent = `model ${h.model} · backend ${h.backend}`;
   }catch{ $('#healthMeta').textContent = ''; }
+}
+
+async function loadChain(){
+  const el = $('#chainMeta');
+  try{
+    const c = await (await fetch('/api/chain')).json();
+    if(c.intact){
+      el.textContent = `chain intact · ${c.length} entries · head ${String(c.head).slice(0,12)}…`;
+      el.style.color = 'var(--ok)';
+    }else{
+      el.textContent = `CHAIN BROKEN · ${c.broken.length} altered row(s)`;
+      el.style.color = 'var(--bad)';
+    }
+  }catch{ el.textContent = ''; }
 }
 
 function kpi(n,l){ return `<div class="kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`; }
@@ -211,7 +228,7 @@ $('#runBtn').addEventListener('click', async () => {
         if(ev.type === 'status') addEv(`<span class="stage">[${esc(ev.stage)}] ${esc(ev.agent)}</span> ${esc(ev.message)}`);
         else if(ev.type === 'agent_result') addEv(`<span class="stage">[${esc(ev.stage)}] ${esc(ev.agent)}</span><pre>${esc(JSON.stringify(ev.data, null, 2))}</pre>`);
         else if(ev.type === 'decision_stop') addEv('STOP — ' + esc(ev.message), 'err');
-        else if(ev.type === 'complete'){ addEv('ADMITTED — ' + esc(ev.message), 'ok'); loadScorecard(); loadPromises(); }
+        else if(ev.type === 'complete'){ addEv('ADMITTED — ' + esc(ev.message), 'ok'); loadScorecard(); loadPromises(); loadChain(); }
         else if(ev.type === 'error') addEv('ERROR — ' + esc(ev.message), 'err');
       }
     }
@@ -236,7 +253,7 @@ $('#reverifyBtn').addEventListener('click', async () => {
   b.disabled = false;
 });
 
-loadHealth(); loadScorecard(); loadPromises();
+loadHealth(); loadChain(); loadScorecard(); loadPromises();
 </script>
 </body>
 </html>

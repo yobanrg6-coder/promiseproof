@@ -119,6 +119,18 @@ def admit_promise(
 
 
 @mcp.tool()
+def verify_ledger_chain() -> dict:
+    """Recompute the append-only hash chain over every admitted promise from
+    the genesis hash. Each entry_hash covers the immutable claim (verbatim
+    quote, company, deadline, observable outcome) plus the previous entry's
+    hash, so editing a stored quote or nudging a deadline after the fact breaks
+    that row and every row admitted after it. Returns {length, intact, broken,
+    head}: `intact` true means no stored claim has been altered since it was
+    admitted; `broken` lists the offending rows in order."""
+    return ledger.verify_chain()
+
+
+@mcp.tool()
 def run_verification_cycle(check_date: str = "") -> dict:
     """Re-check every promise whose deadline has passed against its evidence
     page (zero LLM) and persist any status change. Returns how many were

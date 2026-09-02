@@ -1,0 +1,56 @@
+name: zero-LLM verification cycle
+
+# Every 6 hours, re-run the deterministic verifier over the whole ledger and
+# commit the result. No API key, no model call. Because the updated
+# data/ledger.json is committed straight back to the repo, the ledger's history
+# is a public, tamper-evident git log - every status change is one signed
+# commit anyone can inspect, which is the whole point of an accountability tool.
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-cycle
+  cancel-in-progress: false
+
+jobs:
+  reverify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the zero-LLM deps only
+        run: pip install --no-cache-dir -r requirements-cycle.txt
+
+      - name: Re-verify every promise against its live evidence page
+        run: python -m ledger.run_cycle --all
+
+      - name: Verify the hash chain is still intact
+        run: |
+          python - <<'PY'
+          import sys
+          from ledger.promises import verify_chain
+          c = verify_chain()
+          print(c)
+          sys.exit(0 if c["intact"] else 1)
+          PY
+
+      - name: Commit the refreshed ledger if it changed
+        run: |
+          if git diff --quiet -- data/ledger.json; then
+            echo "no ledger change this cycle"
+            exit 0
+          fi
+          git config user.name  "promiseproof-cycle[bot]"
+          git config user.email "promiseproof-cycle@users.noreply.github.com"
+          git add data/ledger.json
+          git commit -m "cycle: re-verify ledger ($(date -u +%Y-%m-%dT%H:%MZ))"
+          git push

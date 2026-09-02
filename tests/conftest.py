@@ -21,5 +21,8 @@ def _isolate_ledger_backend(monkeypatch, tmp_path):
 def _no_wayback(monkeypatch):
     """The verifier consults the Wayback Machine for a point-in-time capture.
     Default every test to "no snapshot" so the suite stays offline; tests that
-    exercise the archive path patch ledger.verifier.snapshot_near explicitly."""
+    exercise the archive path patch ledger.verifier.snapshot_at_or_before
+    (probe 1, at/before the deadline) or ledger.verifier.snapshot_near
+    (probe 2, roughly now) explicitly."""
+    monkeypatch.setattr("ledger.verifier.snapshot_at_or_before", lambda *a, **k: None)
     monkeypatch.setattr("ledger.verifier.snapshot_near", lambda *a, **k: None)

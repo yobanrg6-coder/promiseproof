@@ -171,6 +171,14 @@ async def api_scorecard():
     return ledger.get_scorecard()
 
 
+@app.get("/api/chain")
+async def api_chain():
+    """Append-only hash-chain integrity over the admitted claims (zero LLM):
+    {length, intact, broken, head}. `intact` false means a stored quote or
+    deadline was edited after admission."""
+    return ledger.verify_chain()
+
+
 @app.get("/api/promises")
 async def api_promises():
     rows = ledger.list_promises()

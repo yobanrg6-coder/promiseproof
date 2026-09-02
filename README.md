@@ -36,16 +36,24 @@ that fetches the official page and checks it.
 3. **Gate** it with pure Python — a real deadline, not absurd, ≥2 distinct
    specific keywords, a substantive outcome. The gate admits, not the model.
 4. **Verify** it with **zero LLM**, point-in-time. Two probes: the official
-   page **as archived by the Wayback Machine on or before the deadline** (if
-   the check keywords are in that capture, the promise was kept on time and
-   the capture date is the dated proof — no prose-date guessing, no third
-   party but a neutral public archive), then the page **now** (which, combined
-   with probe 1, gives late vs delayed vs abandoned). A fixed decision table
-   turns the two readings into one status, and every verdict records how it
-   was reached (`wayback@deadline`, `live-page`, …).
+   page **as archived by the Wayback Machine on or before the deadline** —
+   the CDX API's *last* capture at/before that date, never one from after it
+   (if the check keywords are in that capture, the promise was kept on time
+   and the capture date is the dated proof — no prose-date guessing, no third
+   party but a neutral public archive) — then the page **now** (which,
+   combined with probe 1, gives late vs delayed vs abandoned). A fixed
+   decision table turns the two readings into one status, and every verdict
+   records how it was reached (`wayback@deadline`, `live-page`, …).
 5. **Score** it — a per-company and overall scorecard: kept on time / undated /
    late / delayed / abandoned / unverifiable, and an on-time rate that is a
    count, not a claim.
+6. **Chain** it — every admission is appended to a SHA-256 hash chain over the
+   immutable claim (verbatim quote, company, deadline, observable outcome).
+   Editing a stored quote or nudging a deadline after the fact breaks that
+   row's hash and every row after it; `GET /api/health`'s sibling
+   `GET /api/chain` (and the MCP `verify_ledger_chain` tool) recompute it from
+   genesis. Deployed, the 6-hourly cycle commits the refreshed ledger back to
+   git, so the whole history is a public, tamper-evident log.
 
 ### The seven statuses
 
@@ -96,9 +104,9 @@ LLM-free.
 | `agents/promise_orchestrator.py` | the extract → audit → re-extract → gate → admit pipeline, as an async event stream |
 | `agents/falsifiability_gate.py` | deterministic admission check, no LLM |
 | `ledger/evidence.py` | HTTP fetch + HTML→text (+ Wayback toolbar strip, entity decode) + whole-token keyword match, no JS |
-| `ledger/archive.py` | Wayback Machine lookup — the official page as captured near a given date |
+| `ledger/archive.py` | Wayback lookup — CDX "last capture ≤ deadline" for probe 1, availability API for "roughly now" |
 | `ledger/verifier.py` | the zero-LLM, two-probe (archived-at-deadline / now) decision table |
-| `ledger/promises.py` | store + scorecard; backend = JSON file / Firestore / in-memory |
+| `ledger/promises.py` | store + scorecard + append-only SHA-256 hash chain; backend = JSON file / Firestore / in-memory |
 | `mcp_server/server.py` | FastMCP server exposing the ledger over the Model Context Protocol |
 | `web_app/` | FastAPI + a single static page: scorecard + live pipeline stream |
 

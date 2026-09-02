@@ -164,3 +164,11 @@ class LedgerPromise(BaseModel):
     # audit trail: independent second opinion on falsifiability (Nemotron Super vs. Nemotron Nano)
     extractor_model: str = ""
     auditor_agreed: bool | None = None
+    # append-only hash chain over the IMMUTABLE claim (quote, deadline, what
+    # counts as delivery) - not the evolving verdict, which anyone can recompute
+    # from public evidence. seq is the admission order; entry_hash chains to the
+    # previous entry's, so a stored quote or deadline can't be edited after the
+    # fact without breaking every link after it. See ledger.promises.verify_chain.
+    seq: int = 0
+    prev_hash: str = ""
+    entry_hash: str = ""
