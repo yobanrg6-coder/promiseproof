@@ -1,11 +1,12 @@
-# Deploy: Hugging Face Spaces + GitHub Actions (zero cost, no GCP)
+# Hosting History & Alternatives: Cloud Run vs Hugging Face Spaces
 
-This is the no-billing path. The web app runs on a free HF Space; the
-zero-LLM re-verification cycle runs as a scheduled GitHub Action that commits
-`data/ledger.json` back to the repo (so the ledger's history is a public git
-log). No Firestore, no Cloud Run, no card.
+> **Active production deployment**: PromiseProof is deployed to **Google Cloud Run** at:
+> `https://promiseproof-675045340103.us-central1.run.app`
+> using `min-instances=0` (scale to zero when idle) and pulling the verified ledger on boot.
+>
+> *(The section below is kept for historical reference on the Docker Space alternative).*
 
-## 1. The web app on Hugging Face Spaces
+## 1. The web app on Hugging Face Spaces (Historical / Alternative)
 
 The GitHub Action `.github/workflows/sync-to-hf-space.yml` pushes `master` to
 the Space on every commit and injects the HF README frontmatter in CI (so the

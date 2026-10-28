@@ -1,0 +1,17 @@
+# What `gcloud run deploy --source=.` must never upload to Cloud Build.
+.gcloudignore
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+PASOS_*.txt
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+tests/
+BITACORA_PROYECTO.md
+HANDOFF_28ago.md

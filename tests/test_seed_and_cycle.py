@@ -100,3 +100,42 @@ def test_reverify_all_covers_the_whole_ledger_run_cycle_only_a_subset(monkeypatc
     full_checked = reverify_all(check_date=check, backend=be)["checked"]
     assert full_checked == len(SEED_PROMISES)
     assert cycle_checked < full_checked
+
+
+def test_sync_ledger_from_repo_sends_bearer_token(monkeypatch, tmp_path):
+    import run as run_mod
+
+    src = tmp_path / "remote.json"
+    be = JsonFileBackend(src)
+    promises.admit_promise(
+        company="Acme", promise_text="ship X", source_quote="q", source_url="u",
+        announced_date="2024-01-01", deadline_raw="Q2 2024", deadline_date="2024-06-30",
+        observable_outcome="Feature X on the dashboard", check_keywords=["Feature X", "Acme Dashboard"],
+        evidence_url="https://e.co/docs", backend=be,
+    )
+    payload = src.read_text(encoding="utf-8")
+    target = tmp_path / "local.json"
+
+    captured = {}
+
+    class _FakeResp:
+        text = payload
+
+        def raise_for_status(self):
+            pass
+
+    def _fake_get(url, headers=None, **kw):
+        captured["url"] = url
+        captured["headers"] = headers
+        return _FakeResp()
+
+    monkeypatch.setenv("LEDGER_BACKEND", "json")
+    monkeypatch.setenv("LEDGER_JSON_PATH", str(target))
+    monkeypatch.setenv("LEDGER_SYNC_URL", "https://raw.githubusercontent.com/org/repo/master/data/ledger.json")
+    monkeypatch.setenv("LEDGER_SYNC_TOKEN", "github_pat_test_123")
+    monkeypatch.setattr(run_mod.httpx, "get", _fake_get)
+
+    run_mod.sync_ledger_from_repo()
+    assert captured["headers"] == {"Authorization": "Bearer github_pat_test_123"}
+    assert target.exists()
+

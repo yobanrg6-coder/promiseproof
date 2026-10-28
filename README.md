@@ -53,7 +53,7 @@ that fetches the official page and checks it.
    row's hash and every row after it; `GET /api/health`'s sibling
    `GET /api/chain` (and the MCP `verify_ledger_chain` tool) recompute it from
    genesis. Deployed, the 6-hourly cycle commits the refreshed ledger back to
-   git, so the whole history is a public, tamper-evident log.
+   git, so the whole history is an auditable, tamper-evident log.
 
 ### The seven statuses
 
@@ -193,7 +193,7 @@ Cloud Run exposes one port (the web app). The FastMCP server also runs in the
 container but on an internal port — connect an MCP client to it by running the
 stack locally (`python run.py`, then point the client at
 `http://127.0.0.1:8081/mcp`). The web app talks to the same ledger module
-directly, so the public demo is fully functional without it.
+directly, so the live demo (`https://promiseproof-675045340103.us-central1.run.app`) is fully functional without it.
 
 ---
 

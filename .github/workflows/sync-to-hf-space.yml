@@ -11,8 +11,6 @@ name: sync to Hugging Face Space
 #   4. Space secret  NEBIUS_API_KEY = the Nebius key (only the live pipeline demo needs it)
 
 on:
-  push:
-    branches: [master]
   workflow_dispatch: {}
 
 concurrency:

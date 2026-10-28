@@ -36,6 +36,42 @@ def warn_on_missing_config():
         print("   (copy .env.example to .env, key from https://studio.nebius.com/).\n")
 
 
+def sync_ledger_from_repo():
+    """Pull the latest re-verified ledger before serving.
+
+    The 6-hour cycle runs on GitHub Actions and commits data/ledger.json; a
+    container image only carries the copy from build time. When
+    LEDGER_SYNC_URL is set (the raw URL of that file), fetch it on boot and
+    swap it in - but only if its hash chain is intact, so a bad download can
+    never replace a good baseline. Any failure keeps the baked-in file.
+    """
+    url = os.getenv("LEDGER_SYNC_URL", "").strip()
+    if not url or os.getenv("LEDGER_BACKEND", "json").strip().lower() != "json":
+        return
+    from ledger.promises import DEFAULT_JSON_PATH, JsonFileBackend, verify_chain
+
+    target = os.getenv("LEDGER_JSON_PATH") or str(DEFAULT_JSON_PATH)
+    tmp = target + ".sync"
+    try:
+        token = os.getenv("LEDGER_SYNC_TOKEN", "").strip()
+        headers = {"Authorization": f"Bearer {token}"} if token else None
+        resp = httpx.get(url, headers=headers, timeout=10.0, follow_redirects=True)
+        resp.raise_for_status()
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(resp.text)
+        chain = verify_chain(JsonFileBackend(tmp))
+        if not chain["intact"] or not chain["length"]:
+            print(f"   Ledger sync skipped: downloaded chain not intact ({chain['length']} rows).")
+            os.remove(tmp)
+            return
+        os.replace(tmp, target)
+        print(f"   Ledger synced from repo: {chain['length']} promises, head {chain['head'][:12]}.")
+    except Exception as exc:  # noqa: BLE001 - a sync failure must never stop the demo booting
+        print(f"   Ledger sync failed ({exc!r}); serving the baked-in ledger.")
+        if os.path.exists(tmp):
+            os.remove(tmp)
+
+
 _mcp_proc: subprocess.Popen | None = None
 
 
@@ -95,6 +131,7 @@ def main():
     """)
 
     warn_on_missing_config()
+    sync_ledger_from_repo()
 
     # 8081, matching mcp_server/server.py's own MCP_SERVER_PORT default and the
     # Dockerfile. Deliberately NOT 8080: that is the conventional value of the
