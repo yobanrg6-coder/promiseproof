@@ -68,6 +68,29 @@ VERIFY_LIMIT_WINDOW_SECONDS = 300
 _verify_log: dict[str, deque] = defaultdict(deque)
 
 
+# Global daily ceiling on live LLM runs that use the SERVER's Nebius key. The
+# per-IP limit above is bypassable with many IPs; this caps total spend no
+# matter how many callers there are. Callers who paste their own key are not
+# counted. Resets at UTC midnight; per-process memory (one instance deployed).
+DAILY_SERVER_KEY_LIMIT = int(os.getenv("DAILY_SERVER_KEY_LIMIT", "60"))
+_daily_usage = {"day": "", "count": 0}
+
+
+def _spend_daily_budget() -> None:
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    if _daily_usage["day"] != today:
+        _daily_usage["day"] = today
+        _daily_usage["count"] = 0
+    if _daily_usage["count"] >= DAILY_SERVER_KEY_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=("Daily live-demo limit reached (to protect the project's "
+                    "inference budget). The scorecard and ledger stay fully "
+                    "browsable; see the demo video, or try again after 00:00 UTC."),
+        )
+    _daily_usage["count"] += 1
+
+
 def _resolve_client_ip(request: Request) -> str:
     # Behind Cloud Run's front end, request.client.host is Google's internal
     # proxy, identical for everyone. The real client IP is the LAST entry of
@@ -214,6 +237,8 @@ async def extract_stream(req: ExtractRequest, request: Request):
     _rate_limit(_request_log, _resolve_client_ip(request),
                 RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_SECONDS)
     resolved_key = req.api_key or os.getenv("NEBIUS_API_KEY")
+    if not req.api_key and resolved_key:
+        _spend_daily_budget()
 
     async def event_generator():
         if not resolved_key:

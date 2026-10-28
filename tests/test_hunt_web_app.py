@@ -69,3 +69,18 @@ def test_extract_request_rejects_well_formatted_but_impossible_calendar_dates(im
             source_url="https://acme.com",
             announced_date=impossible,
         )
+
+
+def test_daily_server_key_budget_blocks_after_limit(monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+
+    from web_app import app as web
+
+    monkeypatch.setattr(web, "DAILY_SERVER_KEY_LIMIT", 2)
+    monkeypatch.setattr(web, "_daily_usage", {"day": "", "count": 0})
+    web._spend_daily_budget()
+    web._spend_daily_budget()
+    with pytest.raises(HTTPException) as exc:
+        web._spend_daily_budget()
+    assert exc.value.status_code == 429
