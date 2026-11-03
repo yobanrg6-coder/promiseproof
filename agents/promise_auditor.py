@@ -18,7 +18,7 @@ from google.adk.models.lite_llm import LiteLlm
 
 from agents.promise_schemas import PromiseAudit
 
-DEFAULT_AUDITOR_MODEL = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+DEFAULT_AUDITOR_MODEL = "nvidia/Nemotron-3_5-Lightning"
 
 SYSTEM_INSTRUCTION = """You audit a proposed ledger entry - an extracted "falsifiable promise" - and decide,
 adversarially, whether it is crisp enough to be checked TRUE or FALSE later with no AI. Assume it is too

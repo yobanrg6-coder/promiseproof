@@ -17,7 +17,7 @@ from google.adk.models.lite_llm import LiteLlm
 
 from agents.promise_schemas import PromiseExtraction
 
-DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b"
+DEFAULT_MODEL = "nvidia/Nemotron-3.5-Super-VL"
 
 SYSTEM_INSTRUCTION = """You extract FALSIFIABLE product promises from company announcements for a public
 accountability ledger. The ledger only holds promises that can later be checked TRUE or FALSE against a
